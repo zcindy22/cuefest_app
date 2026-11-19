@@ -12,7 +12,7 @@ You need two terminal windows (or tabs).
 
 **Terminal 1 — start the Metro bundler:**
 ```bash
-npx expo start --web
+npx expo start --web --port 8081
 ```
 
 **Terminal 2 — start the proxy:**
@@ -22,7 +22,7 @@ node web-proxy.js
 
 Then open **http://localhost:8082** (not 8081) in Chrome or any modern browser.
 
-> The proxy adds the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers that expo-sqlite needs to run its WebAssembly engine in the browser.
+> The proxy adds the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers that expo-sqlite needs to run its WebAssembly engine in the browser. Always open 8082 — opening 8081 directly skips the headers and SQLite will crash.
 
 **To stop:** `Ctrl+C` in both terminals.
 

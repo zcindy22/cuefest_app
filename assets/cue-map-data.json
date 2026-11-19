@@ -94,47 +94,47 @@
     {
       "key": "first_aid",
       "label": "First aid",
-      "color": "#D9423E"
+      "color": "#E5484D"
     },
     {
       "key": "water",
       "label": "Water",
-      "color": "#3E8BD9"
+      "color": "#3E8BFF"
     },
     {
       "key": "restroom",
       "label": "Restrooms",
-      "color": "#2B2B6B"
+      "color": "#6E6EF0"
     },
     {
       "key": "food",
       "label": "Food",
-      "color": "#E08A3C"
+      "color": "#FF8A3D"
     },
     {
       "key": "bar",
       "label": "Cocktail bar",
-      "color": "#8A5BC7"
+      "color": "#C85BD9"
     },
     {
       "key": "merch",
       "label": "Merch",
-      "color": "#2B2B6B"
+      "color": "#6E6EF0"
     },
     {
       "key": "info",
       "label": "Info",
-      "color": "#3E8BD9"
+      "color": "#3E8BFF"
     },
     {
       "key": "lost_found",
       "label": "Lost and found",
-      "color": "#6B8E23"
+      "color": "#2FB67C"
     },
     {
       "key": "lockers",
       "label": "Lockers",
-      "color": "#C75B9E"
+      "color": "#FF5FA8"
     },
     {
       "key": "accessible",
@@ -144,7 +144,7 @@
     {
       "key": "box_office",
       "label": "Box office",
-      "color": "#444444"
+      "color": "#6B6B78"
     }
   ],
   "amenities": [

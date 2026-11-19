@@ -1,47 +1,50 @@
 /**
- * Getting There screen
+ * app/(tabs)/index.jsx
  *
- * - Timeline: Leave home → Take transit → Arrive at entrance → plan_items sets
- * - Transit status badge (simulated)
- * - Open Directions button (Google Maps, current location → festival entrance)
- * - Directions home / next stop (text input, not saved, opens Google Maps)
- * - Replan button: 3 scripted disruptions, counter, disable after 3rd
- * - Latest replan card (what changed + why)
- * - Replan history list
- * - Reset demo button after 3 replans
+ * Lineup page — Prompt 8.
+ * Header: title + Sample day pill + round yellow navigate button.
+ * Day tabs: Friday / Saturday (Saturday default, pink underline).
+ * Segmented control: Timeline | Saved | All acts.
+ * Directions: plain Linking.openURL to Google Maps, no sheet or picker.
+ * Demo location switch at the very bottom.
+ *
+ * Replan code, helper files and tables are untouched — just not shown.
  */
 
 import { useCallback, useState } from 'react';
 import {
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDb } from '../../db/database';
-import { runReplan, resetDemo } from '../../lib/replan';
-import DemoLocationChip from '../../components/DemoLocationChip';
+import { getDemoLocationSetting, setDemoLocationSetting } from '../../lib/location';
+import ArtistCard from '../../components/ArtistCard';
+import ScheduleTimeline from '../../components/ScheduleTimeline';
 import {
   Colors,
   Fonts,
-  headingStyle,
-  labelStyle,
   bodyStyle,
   cardStyle,
-  buttonTextStyle,
+  headingStyle,
 } from '../../theme/theme';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Google Maps directions ────────────────────────────────────────────────────
+// No travelmode — Google Maps uses its own default and the person can switch there.
 
-const DIRECTIONS_TO_FESTIVAL =
-  'https://www.google.com/maps/dir/?api=1&destination=2217%20NW%205th%20Ave%2C%20Miami%2C%20FL&travelmode=transit';
+const DESTINATION = '2217%20NW%205th%20Ave%2C%20Miami%2C%20FL';
+const DEMO_ORIGIN = 'Wynwood%2C%20Miami%2C%20FL';
 
-const FESTIVAL_ORIGIN = '2217%20NW%205th%20Ave%2C%20Miami%2C%20FL';
+function directionsUrl(demoOn) {
+  const base = `https://www.google.com/maps/dir/?api=1&destination=${DESTINATION}`;
+  return demoOn ? `${base}&origin=${DEMO_ORIGIN}` : base;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,576 +52,444 @@ function fmt(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
+  const h12  = h % 12 || 12;
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function toMins(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
 
-export default function GettingThereScreen() {
-  const [state, setState]           = useState(null);   // replan_state row
-  const [planItems, setPlanItems]   = useState([]);
-  const [replanLog, setReplanLog]   = useState([]);
-  const [lastReplan, setLastReplan] = useState(null);   // { reason, what_changed }
-  const [destText, setDestText]     = useState('');     // directions dest input, never saved
-  const [originText, setOriginText] = useState('');     // starting-from input, never saved
-  const [homeOpen, setHomeOpen]     = useState(false);  // collapsible: directions home
-  const [historyOpen, setHistoryOpen] = useState(false); // collapsible: replan history
+function initials(name) {
+  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
 
-  // ── Load from DB on focus ──────────────────────────────────────────────────
-  useFocusEffect(
-    useCallback(() => {
-      loadAll();
-    }, [])
+const GENRE_COLORS = {
+  'Dance':   Colors.yellow,
+  'Techno':  Colors.blue,
+  'Bass':    Colors.peach,
+  'Latin':   Colors.pink,
+  'Indie':   Colors.lilac,
+  'Alt R&B': Colors.pink,
+  'Electro': Colors.blue,
+  'Hip hop': Colors.yellow,
+};
+function genreColor(genre) { return GENRE_COLORS[genre] ?? Colors.yellow; }
+
+// ─── Small shared components ──────────────────────────────────────────────────
+
+function InitialsTile({ name, genre, size = 44 }) {
+  const bg = genreColor(genre);
+  return (
+    <View style={[tileStyles.tile, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
+      <Text style={[tileStyles.text, { fontSize: Math.max(12, size * 0.33) }]}>
+        {initials(name)}
+      </Text>
+    </View>
   );
+}
+const tileStyles = StyleSheet.create({
+  tile: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: Colors.ink },
+  text: { fontFamily: Fonts.bodyBold, color: Colors.ink },
+});
+
+function GenreChip({ genre }) {
+  return (
+    <View style={[chipSt.chip, { backgroundColor: genreColor(genre) }]}>
+      <Text style={chipSt.text}>{genre}</Text>
+    </View>
+  );
+}
+const chipSt = StyleSheet.create({
+  chip: { borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1.5, borderColor: Colors.ink, alignSelf: 'flex-start' },
+  text: { fontFamily: Fonts.bodyBold, fontSize: 13, color: Colors.ink },
+});
+
+function SegmentedControl({ tabs, active, onSelect }) {
+  return (
+    <View style={segSt.row}>
+      {tabs.map(t => (
+        <TouchableOpacity
+          key={t}
+          style={[segSt.tab, active === t && segSt.tabActive]}
+          onPress={() => onSelect(t)}
+          hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+        >
+          <Text style={[segSt.text, active === t && segSt.textActive]}>{t}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+const segSt = StyleSheet.create({
+  row: { flexDirection: 'row', backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.ink, borderRadius: 100, marginBottom: 16, overflow: 'hidden', minHeight: 48 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  tabActive: { backgroundColor: Colors.ink, borderRadius: 100, margin: 3 },
+  text: { fontFamily: Fonts.bodyBold, fontSize: 14, color: Colors.ink },
+  textActive: { color: Colors.white },
+});
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function LineupScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const [day, setDay]               = useState('Sat');
+  const [view, setView]             = useState('Timeline');
+  const [acts, setActs]             = useState([]);
+  const [savedActIds, setSavedActIds] = useState([]);
+  const [planItems, setPlanItems]   = useState([]);
+  const [demoOn, setDemoOn]         = useState(true);
+  const [detailAct, setDetailAct]   = useState(null);
 
   function loadAll() {
     const db = getDb();
-    setState(db.getFirstSync('SELECT * FROM replan_state WHERE id = 1'));
+    setActs(db.getAllSync(
+      'SELECT id, stage_id, act_name, start_time, end_time, genre, subgenre, bio, day FROM sets ORDER BY stage_id, start_time'
+    ));
+    setSavedActIds(db.getAllSync('SELECT act_id FROM saved_acts').map(r => r.act_id));
     setPlanItems(db.getAllSync(
-      'SELECT id, act_name, stage_name, start_time, end_time FROM plan_items ORDER BY start_time ASC'
+      'SELECT set_id, act_name, stage_name, start_time, end_time FROM plan_items ORDER BY start_time'
     ));
-    setReplanLog(db.getAllSync(
-      'SELECT replan_number, reason, what_changed FROM replan_log ORDER BY replan_number ASC'
-    ));
+    const val = getDemoLocationSetting(db);
+    setDemoOn(val === 'on');
   }
 
-  // ── Replan handler ─────────────────────────────────────────────────────────
-  function handleReplan() {
-    if (!state || state.replans_used >= 3) return;
+  useFocusEffect(useCallback(() => { loadAll(); }, [])); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleSaved(actId) {
     const db = getDb();
-    const nextReplan = state.replans_used + 1;
-    const result = runReplan(nextReplan, db);
-    setLastReplan({ number: nextReplan, ...result });
-    loadAll();
-  }
-
-  // ── Reset handler ──────────────────────────────────────────────────────────
-  function handleReset() {
-    Alert.alert(
-      'Reset demo',
-      'This will clear your plan and restore all original times. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            const db = getDb();
-            resetDemo(db);
-            setLastReplan(null);
-            loadAll();
-          },
-        },
-      ]
-    );
-  }
-
-  // ── Open directions to festival ────────────────────────────────────────────
-  function openDirectionsToFestival() {
-    // If user typed a starting location, include it; otherwise Google Maps uses current location
-    if (originText.trim()) {
-      const encodedOrigin = encodeURIComponent(originText.trim());
-      const url = `https://www.google.com/maps/dir/?api=1&origin=${encodedOrigin}&destination=2217%20NW%205th%20Ave%2C%20Miami%2C%20FL&travelmode=transit`;
-      Linking.openURL(url);
+    if (savedActIds.includes(actId)) {
+      db.runSync('DELETE FROM saved_acts WHERE act_id = ?', [actId]);
+      setSavedActIds(ids => ids.filter(id => id !== actId));
     } else {
-      Linking.openURL(DIRECTIONS_TO_FESTIVAL);
+      db.runSync('INSERT OR IGNORE INTO saved_acts (act_id) VALUES (?)', [actId]);
+      setSavedActIds(ids => [...ids, actId]);
     }
   }
 
-  // ── Open directions home / next stop ──────────────────────────────────────
-  function openDirectionsHome() {
-    if (!destText.trim()) {
-      Alert.alert('Enter a destination', 'Type an address or place name first.');
-      return;
-    }
-    const encoded = encodeURIComponent(destText.trim());
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${FESTIVAL_ORIGIN}&destination=${encoded}&travelmode=transit`;
-    Linking.openURL(url);
+  function toggleDemo() {
+    const db = getDb();
+    const next = demoOn ? 'off' : 'on';
+    setDemoLocationSetting(db, next);
+    setDemoOn(!demoOn);
   }
 
-  // ── Derived ────────────────────────────────────────────────────────────────
-  const replansUsed  = state?.replans_used ?? 0;
-  const transitStatus = state?.transit_status ?? 'on_time';
-  const isDelayed    = transitStatus === 'delayed';
+  function openDirections() {
+    Linking.openURL(directionsUrl(demoOn));
+  }
 
-  // Build timeline rows
-  const anchorRows = [
-    {
-      key: 'leave',
-      time: state?.leave_home ?? '17:00',
-      label: 'Leave home',
-      dotColor: Colors.yellow,
-    },
-    {
-      key: 'transit',
-      time: state?.transit_time ?? '17:20',
-      label: 'Take transit',
-      dotColor: Colors.yellow,
-    },
-    {
-      key: 'arrive',
-      time: state?.arrive_time ?? '18:25',
-      label: 'Arrive at the entrance',
-      dotColor: Colors.yellow,
-    },
-  ];
+  function findOnMap(act) {
+    setDetailAct(null);
+    const db = getDb();
+    db.runSync(
+      `INSERT INTO settings (key, value) VALUES ('open_stage', ?)
+       ON CONFLICT(key) DO UPDATE SET value = ?`,
+      [String(act.stage_id), String(act.stage_id)]
+    );
+    router.navigate('/(tabs)/stage-finder');
+  }
 
-  const setRows = planItems.map(item => ({
-    key: `set_${item.id}`,
-    time: item.start_time,
-    label: `${item.act_name}${item.stage_name ? ', ' + item.stage_name : ''}`,
-    dotColor: Colors.pink,
-  }));
+  // ── Data for each view ───────────────────────────────────────────────────────
 
-  const timelineRows = [...anchorRows, ...setRows].sort((a, b) =>
-    a.time.localeCompare(b.time)
-  );
+  const dayActs = acts.filter(a => a.day === day);
+  const dayActsSorted = [...dayActs].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // Saved view: merge saved_acts + plan_items by set_id, no duplicates
+  // plan_items stores set_id as a column, so we match on that
+  const savedIdsForDay = dayActs.filter(a => savedActIds.includes(a.id)).map(a => a.id);
+  const planSetIdsForDay = planItems
+    .filter(p => {
+      const act = acts.find(a => a.id === p.set_id);
+      return act && act.day === day;
+    })
+    .map(p => p.set_id);
+  const mergedSetIds = [...new Set([...savedIdsForDay, ...planSetIdsForDay])];
+  const savedActsForDay = mergedSetIds
+    .map(id => acts.find(a => a.id === id))
+    .filter(Boolean)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <ScrollView contentContainerStyle={styles.content}>
 
-      {/* Header */}
-      <Text style={styles.appLabel}>CUE SAMPLE FESTIVAL DAY</Text>
-      <Text style={styles.heading}>GETTING THERE</Text>
-
-      {/* Demo chip + transit badge on one row */}
-      <View style={styles.chipRow}>
-        <DemoLocationChip />
-        <View style={[styles.transitBadge, isDelayed && styles.transitBadgeDelayed]}>
-          <Text style={styles.transitBadgeText}>
-            TRANSIT: {isDelayed ? 'DELAYED' : 'ON TIME'} (SIMULATED)
-          </Text>
-        </View>
-      </View>
-
-      {/* Latest replan card */}
-      {lastReplan && (
-        <View style={styles.replanCard}>
-          <View style={styles.replanBadge}>
-            <Text style={styles.replanBadgeText}>REPLAN {lastReplan.number} OF 3</Text>
-          </View>
-          <Text style={styles.replanTitle}>{lastReplan.reason}</Text>
-          <Text style={styles.replanBody}>{lastReplan.what_changed}</Text>
-        </View>
-      )}
-
-      {/* Timeline */}
-      <View style={styles.timeline}>
-        {timelineRows.map((row, i) => (
-          <View key={row.key} style={styles.timelineRow}>
-            {/* Time column */}
-            <Text style={styles.timeLabel}>{fmt(row.time)}</Text>
-
-            {/* Dot + line column */}
-            <View style={styles.dotCol}>
-              <View style={[styles.dot, { backgroundColor: row.dotColor }]} />
-              {i < timelineRows.length - 1 && <View style={styles.line} />}
+        {/* Header row */}
+        <View style={styles.headerRow}>
+          <Text style={styles.heading}>Lineup</Text>
+          <View style={styles.headerRight}>
+            <View style={styles.samplePill}>
+              <Text style={styles.samplePillText}>Sample day</Text>
             </View>
-
-            {/* Label column */}
-            <View style={styles.timelineTextCol}>
-              <Text style={styles.timelineLabel} numberOfLines={1}>{row.label}</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.navBtn}
+              onPress={openDirections}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Get directions to festival"
+            >
+              <Ionicons name="navigate-outline" size={20} color={Colors.ink} />
+            </TouchableOpacity>
           </View>
-        ))}
+        </View>
 
-        {planItems.length === 0 && (
-          <Text style={styles.emptyPlan}>
-            No sets yet. Add one in Stage Finder.
-          </Text>
-        )}
-      </View>
+        {/* Day tabs */}
+        <View style={styles.dayTabRow}>
+          {['Fri', 'Sat'].map(d => (
+            <TouchableOpacity key={d} style={styles.dayTab} onPress={() => setDay(d)}>
+              <Text style={[styles.dayTabText, day === d && styles.dayTabTextActive]}>
+                {d === 'Fri' ? 'Friday' : 'Saturday'}
+              </Text>
+              {day === d && <View style={styles.dayUnderline} />}
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {/* Starting from + Open Directions — merged card */}
-      <View style={styles.originCard}>
-        <Text style={styles.cardTitle}>Starting from</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Leave blank for current location"
-          placeholderTextColor={Colors.textMuted}
-          value={originText}
-          onChangeText={setOriginText}
-          returnKeyType="done"
+        {/* Segmented control */}
+        <SegmentedControl
+          tabs={['Timeline', 'Saved', 'All acts']}
+          active={view}
+          onSelect={setView}
         />
-        <TouchableOpacity style={styles.dirBtn} onPress={openDirectionsToFestival}>
-          <Text style={styles.dirBtnText}>OPEN DIRECTIONS IN GOOGLE MAPS</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Directions home / next stop — collapsible */}
-      <TouchableOpacity style={styles.collapseHeader} onPress={() => setHomeOpen(o => !o)}>
-        <Text style={styles.collapseHeaderText}>DIRECTIONS HOME OR NEXT STOP</Text>
-        <Text style={styles.caret}>{homeOpen ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-      {homeOpen && (
-        <View style={styles.collapseBody}>
-          <Text style={styles.cardSub}>
-            Opens Google Maps from the festival entrance. Not saved.
-          </Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Address or place name"
-            placeholderTextColor={Colors.textMuted}
-            value={destText}
-            onChangeText={setDestText}
-            returnKeyType="done"
+        {/* Timeline view */}
+        {view === 'Timeline' && (
+          <TimelineView
+            acts={dayActsSorted}
+            savedActIds={savedActIds}
+            day={day}
+            onDetail={setDetailAct}
+            onToggleSaved={toggleSaved}
           />
-          <TouchableOpacity style={styles.goBtn} onPress={openDirectionsHome}>
-            <Text style={styles.goBtnText}>GET DIRECTIONS</Text>
+        )}
+
+        {/* Saved view */}
+        {view === 'Saved' && (
+          <SavedView
+            acts={savedActsForDay}
+            day={day}
+            onDetail={setDetailAct}
+            onToggleSaved={toggleSaved}
+            onGoDiscover={() => router.navigate('/(tabs)/my-lineup')}
+          />
+        )}
+
+        {/* All acts view */}
+        {view === 'All acts' && (
+          <AllActsView
+            acts={dayActsSorted}
+            savedActIds={savedActIds}
+            onDetail={setDetailAct}
+            onToggleSaved={toggleSaved}
+          />
+        )}
+
+        {/* Demo location row — bottom of page */}
+        <View style={styles.demoRow}>
+          <Text style={styles.demoLabel}>Demo location</Text>
+          <TouchableOpacity
+            style={[styles.demoToggle, demoOn && styles.demoToggleOn]}
+            onPress={toggleDemo}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.demoToggleText}>{demoOn ? 'ON' : 'OFF'}</Text>
           </TouchableOpacity>
         </View>
-      )}
 
-      {/* Replan row: button + counter */}
-      <View style={styles.replanRow}>
-        <TouchableOpacity
-          style={[styles.replanBtn, replansUsed >= 3 && styles.replanBtnDisabled]}
-          onPress={handleReplan}
-          disabled={replansUsed >= 3}
-        >
-          <Text style={styles.replanBtnText}>
-            {replansUsed >= 3 ? 'REPLAN (ALL 3 USED)' : 'REPLAN'}
-          </Text>
-        </TouchableOpacity>
-        <View style={styles.replanCounter}>
-          <Text style={styles.replanCounterText}>{replansUsed}/3 used</Text>
-        </View>
-      </View>
+      </ScrollView>
 
-      {/* Reset demo button — only after all 3 replans */}
-      {replansUsed >= 3 && (
-        <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-          <Text style={styles.resetBtnText}>RESET DEMO</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Replan history — collapsible */}
-      {replanLog.length > 0 && (
-        <>
-          <TouchableOpacity style={styles.collapseHeader} onPress={() => setHistoryOpen(o => !o)}>
-            <Text style={styles.collapseHeaderText}>REPLAN HISTORY</Text>
-            <Text style={styles.caret}>{historyOpen ? '▲' : '▼'}</Text>
-          </TouchableOpacity>
-          {historyOpen && (
-            <View style={styles.collapseBody}>
-              {replanLog.map(r => (
-                <Text key={r.replan_number} style={styles.historyItem}>
-                  {r.replan_number}. {r.reason} {r.what_changed}
-                </Text>
-              ))}
-            </View>
-          )}
-        </>
-      )}
-
-    </ScrollView>
+      {/* Artist card bottom sheet */}
+      <ArtistCard
+        act={detailAct}
+        savedActIds={savedActIds}
+        onToggleSaved={toggleSaved}
+        onFindOnMap={findOnMap}
+        onClose={() => setDetailAct(null)}
+      />
+    </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Timeline view ────────────────────────────────────────────────────────────
+
+function TimelineView({ acts, savedActIds, day, onDetail, onToggleSaved }) {
+  if (acts.length === 0) {
+    return (
+      <Text style={emptyStyle.text}>No acts scheduled for {day === 'Fri' ? 'Friday' : 'Saturday'}.</Text>
+    );
+  }
+  return (
+    <ScheduleTimeline
+      acts={acts}
+      savedActIds={savedActIds}
+      onDetail={onDetail}
+      onToggleSaved={onToggleSaved}
+    />
+  );
+}
+
+// ─── Saved view ───────────────────────────────────────────────────────────────
+
+function SavedView({ acts, day, onDetail, onToggleSaved, onGoDiscover }) {
+  if (acts.length === 0) {
+    return (
+      <View style={savedSt.empty}>
+        <Text style={savedSt.emptyText}>
+          No saved {day === 'Fri' ? 'Friday' : 'Saturday'} acts yet.
+        </Text>
+        <TouchableOpacity style={savedSt.discoverBtn} onPress={onGoDiscover}>
+          <Text style={savedSt.discoverBtnText}>Go to Discover</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {acts.map((act, i) => {
+        // Overlap: check against other saved acts on the same day
+        const overlaps = acts.some(
+          other =>
+            other.id !== act.id &&
+            toMins(other.start_time) < toMins(act.end_time) &&
+            toMins(other.end_time)   > toMins(act.start_time)
+        );
+        return (
+          <View key={act.id} style={savedSt.card}>
+            <View style={savedSt.cardTop}>
+              <InitialsTile name={act.act_name} genre={act.genre} size={44} />
+              <View style={savedSt.cardMeta}>
+                <TouchableOpacity onPress={() => onDetail(act)}>
+                  <Text style={savedSt.name}>{act.act_name}</Text>
+                </TouchableOpacity>
+                <View style={savedSt.chipRow}>
+                  <GenreChip genre={act.genre} />
+                  {overlaps && (
+                    <View style={savedSt.overlapChip}>
+                      <Text style={savedSt.overlapChipText}>Overlap</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={savedSt.meta}>
+                  Stage {act.stage_id} · {act.day} · {fmt(act.start_time)} – {fmt(act.end_time)}
+                </Text>
+                {act.bio ? (
+                  <Text style={savedSt.bio} numberOfLines={1}>{act.bio}</Text>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                onPress={() => onToggleSaved(act.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={savedSt.heart}>♥</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const savedSt = StyleSheet.create({
+  empty:          { paddingVertical: 32, alignItems: 'center', gap: 16 },
+  emptyText:      { ...bodyStyle, color: Colors.muted, textAlign: 'center' },
+  discoverBtn:    { backgroundColor: Colors.ink, borderRadius: 100, paddingHorizontal: 24, paddingVertical: 14, minHeight: 48 },
+  discoverBtnText: { fontFamily: Fonts.bodyBold, fontSize: 15, color: Colors.white },
+  card:           { ...cardStyle, marginVertical: 4 },
+  cardTop:        { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  cardMeta:       { flex: 1, gap: 4 },
+  name:           { fontFamily: Fonts.display, fontSize: 16, color: Colors.ink },
+  chipRow:        { flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
+  overlapChip:    { backgroundColor: Colors.paleYellow, borderWidth: 1.5, borderColor: Colors.ink, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3 },
+  overlapChipText: { fontFamily: Fonts.detail, fontSize: 13 },
+  meta:           { fontFamily: Fonts.detail, fontSize: 13, color: Colors.muted },
+  bio:            { ...bodyStyle, fontSize: 15, color: Colors.muted },
+  heart:          { fontSize: 22, color: Colors.pink, minWidth: 36, textAlign: 'center' },
+});
+
+// ─── All acts view ────────────────────────────────────────────────────────────
+
+function AllActsView({ acts, savedActIds, onDetail, onToggleSaved }) {
+  if (acts.length === 0) {
+    return <Text style={emptyStyle.text}>No acts for this day.</Text>;
+  }
+  return (
+    <View>
+      {acts.map(act => {
+        const isSaved = savedActIds.includes(act.id);
+        return (
+          <View key={act.id} style={allSt.row}>
+            <InitialsTile name={act.act_name} genre={act.genre} size={40} />
+            <View style={allSt.info}>
+              <TouchableOpacity onPress={() => onDetail(act)}>
+                <Text style={allSt.name}>{act.act_name}</Text>
+              </TouchableOpacity>
+              <View style={allSt.chipRow}>
+                <GenreChip genre={act.genre} />
+              </View>
+              <Text style={allSt.meta}>
+                Stage {act.stage_id} · {fmt(act.start_time)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => onToggleSaved(act.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[allSt.heart, isSaved && allSt.heartFilled]}>
+                {isSaved ? '♥' : '♡'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const allSt = StyleSheet.create({
+  row:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  info:       { flex: 1, gap: 4 },
+  name:       { fontFamily: Fonts.display, fontSize: 16, color: Colors.ink },
+  chipRow:    { flexDirection: 'row', gap: 6 },
+  meta:       { fontFamily: Fonts.detail, fontSize: 13, color: Colors.muted },
+  heart:      { fontSize: 24, color: Colors.muted, minWidth: 36, textAlign: 'center' },
+  heartFilled: { color: Colors.pink },
+});
+
+const emptyStyle = StyleSheet.create({
+  text: { ...bodyStyle, color: Colors.muted, marginTop: 8 },
+});
+
+// ─── Screen styles ────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen:  { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 16, paddingBottom: 48 },
+  screen:       { flex: 1, backgroundColor: Colors.background },
+  content:      { paddingHorizontal: 20, paddingBottom: 48 },
 
-  appLabel: {
-    ...labelStyle,
-    fontSize: 11,
-    backgroundColor: Colors.yellow,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  heading: {
-    ...headingStyle,
-    fontSize: 52,
-    marginBottom: 8,
-  },
+  // Header
+  headerRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 16 },
+  heading:      { ...headingStyle, fontSize: 38 },
+  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  samplePill:   { backgroundColor: Colors.paleYellow, borderWidth: 1.5, borderColor: Colors.ink, borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5 },
+  samplePillText: { fontFamily: Fonts.detail, fontSize: 13 },
+  navBtn:       { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.yellow, borderWidth: 1.5, borderColor: Colors.ink, alignItems: 'center', justifyContent: 'center' },
 
-  // ── Chip + badge row ──
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
+  // Day tabs
+  dayTabRow:    { flexDirection: 'row', gap: 24, marginBottom: 16 },
+  dayTab:       { alignItems: 'center', paddingBottom: 4 },
+  dayTabText:   { fontFamily: Fonts.display, fontSize: 24, color: Colors.muted },
+  dayTabTextActive: { fontSize: 28, color: Colors.ink },
+  dayUnderline: { height: 3, width: '100%', backgroundColor: Colors.pink, borderRadius: 2, marginTop: 2 },
 
-  // ── Transit badge ──
-  transitBadge: {
-    backgroundColor: Colors.blue,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  transitBadgeDelayed: {
-    backgroundColor: Colors.pink,
-  },
-  transitBadgeText: {
-    ...labelStyle,
-    fontSize: 11,
-    letterSpacing: 0.5,
-  },
-
-  // ── Replan card ──
-  replanCard: {
-    backgroundColor: Colors.pink,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 10,
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  replanBadge: {
-    backgroundColor: Colors.black,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 6,
-  },
-  replanBadgeText: {
-    ...labelStyle,
-    color: Colors.white,
-    fontSize: 11,
-  },
-  replanTitle: {
-    ...bodyStyle,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 15,
-    marginBottom: 2,
-  },
-  replanBody: {
-    ...bodyStyle,
-    fontSize: 13,
-  },
-
-  // ── Timeline ──
-  timeline: {
-    marginBottom: 12,
-  },
-  timelineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  timeLabel: {
-    ...labelStyle,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    width: 64,
-    paddingTop: 1,
-    color: Colors.black,
-  },
-  dotCol: {
-    width: 28,
-    alignItems: 'center',
-  },
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    zIndex: 1,
-  },
-  line: {
-    width: 2,
-    flex: 1,
-    minHeight: 15,
-    backgroundColor: Colors.black,
-    alignSelf: 'center',
-  },
-  timelineTextCol: {
-    flex: 1,
-    paddingLeft: 6,
-    paddingBottom: 10,
-  },
-  timelineLabel: {
-    ...bodyStyle,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 13,
-  },
-  emptyPlan: {
-    ...bodyStyle,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-    marginTop: 4,
-    paddingLeft: 92,
-  },
-
-  // ── Origin card (merged with directions button) ──
-  originCard: {
-    ...cardStyle,
-    marginBottom: 10,
-    marginVertical: 0,
-  },
-  cardTitle: { ...bodyStyle, fontFamily: Fonts.bodyBold, fontSize: 14, marginBottom: 6 },
-  cardSub:   { ...bodyStyle, fontSize: 12, color: Colors.textMuted, marginBottom: 8 },
-  textInput: {
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    ...bodyStyle,
-    fontSize: 13,
-    marginBottom: 8,
-    backgroundColor: Colors.white,
-  },
-
-  // ── Open directions button (inside card) ──
-  dirBtn: {
-    backgroundColor: Colors.yellow,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 24,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  dirBtnText: {
-    ...buttonTextStyle,
-    fontFamily: Fonts.heading,
-    fontSize: 15,
-  },
-
-  // ── Collapsible section header ──
-  collapseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 2,
-    marginTop: 8,
-  },
-  collapseHeaderText: {
-    ...labelStyle,
-    fontSize: 11,
-  },
-  caret: {
-    ...labelStyle,
-    fontSize: 10,
-  },
-  collapseBody: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderTopWidth: 0,
-    borderRadius: 4,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    padding: 12,
-    marginBottom: 4,
-  },
-
-  // ── GET DIRECTIONS button ──
-  goBtn: {
-    backgroundColor: Colors.blue,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  goBtnText: { ...buttonTextStyle, fontFamily: Fonts.heading, fontSize: 14 },
-
-  // ── Replan row ──
-  replanRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  replanBtn: {
-    flex: 1,
-    backgroundColor: Colors.black,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  replanBtnDisabled: {
-    opacity: 0.4,
-  },
-  replanBtnText: {
-    ...buttonTextStyle,
-    fontFamily: Fonts.heading,
-    fontSize: 16,
-    color: Colors.white,
-  },
-  replanCounter: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  replanCounterText: {
-    ...labelStyle,
-    fontSize: 11,
-  },
-
-  // ── Reset button ──
-  resetBtn: {
-    backgroundColor: Colors.yellow,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  resetBtnText: {
-    ...buttonTextStyle,
-    fontFamily: Fonts.heading,
-    fontSize: 15,
-  },
-
-  // ── Replan history ──
-  historyItem: {
-    ...bodyStyle,
-    fontSize: 12,
-    marginBottom: 4,
-  },
+  // Demo location row
+  demoRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 32, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.divider },
+  demoLabel:    { fontFamily: Fonts.detail, fontSize: 14, color: Colors.muted },
+  demoToggle:   { borderWidth: 1.5, borderColor: Colors.ink, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: Colors.white },
+  demoToggleOn: { backgroundColor: Colors.yellow },
+  demoToggleText: { fontFamily: Fonts.bodyBold, fontSize: 14, color: Colors.ink },
 });

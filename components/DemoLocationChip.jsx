@@ -52,9 +52,9 @@ export default function DemoLocationChip() {
 const styles = StyleSheet.create({
   chip: {
     alignSelf: 'flex-start',
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
+    borderRadius: 100,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 10,
@@ -66,12 +66,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   text: {
-    fontFamily: Fonts.label,
-    fontSize: 11,
-    color: Colors.black,
+    fontFamily: Fonts.detail,
+    fontSize: 13,
+    color: Colors.ink,
   },
   bold: {
-    fontFamily: Fonts.label,
+    fontFamily: Fonts.detailBold,
     fontWeight: 'bold',
   },
 });
