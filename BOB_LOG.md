@@ -99,3 +99,18 @@
 **Result:** App runs at http://localhost:8082 in Chrome. All four tabs load. SQLite reads stages and plan_items. Demo location chip is visible on every screen. Phone-width layout centers the app on a wide browser window.
 
 ---
+
+## 2026-11-19 — Polish pass: tab bar, Getting There compaction, phone frame (Agent mode)
+
+**You asked:** Replace emoji tab icons with Ionicons, remove the black header bar, compact the Getting There screen to fit on one phone screen, shorten the timeline connector line, fix tab label clipping, constrain the web view to phone dimensions, and update README/BOB_LOG.
+
+**What I did:**
+
+1. **Ionicons tab bar** — replaced all four emoji tab icons with `@expo/vector-icons` Ionicons. Outline when inactive, filled when active: `navigate`, `map`, `musical-notes`, `bag-handle`. Labels: Space Mono 10 px, uppercase, `lineHeight: 13` to prevent clipping. `tabBarStyle` given explicit `height: 64`, `paddingTop: 6`, `paddingBottom: 8`, plus `useSafeAreaInsets` on native so the bar clears the home indicator.
+2. **Header bar removed** — `headerShown: false` on all tabs in `_layout.jsx`. The Bebas Neue heading on each screen replaces it.
+3. **Getting There compaction** — DemoLocationChip and transit badge on one `flex-wrap` row; timeline subtitles removed, dots shrunk (18→14 px), connector `minHeight` reduced and `flexGrow` used so it doesn't over-expand; `lineHeight: 16` on timeline labels; "Starting from" input and Open Directions pill button merged into one card; "Directions home or next stop" collapses with a caret (closed by default); Replan button and `n/3 used` counter badge in a compact row; Replan history collapses (closed by default); empty message shortened to "No sets yet. Add one in Stage Finder."
+4. **Phone frame on web** — extended `web-proxy.js` to inject a `<style>` block into every HTML response, constraining `#root` to 390×844 px, centered on a gray `#888` background with rounded corners and a drop shadow. Removes the need for any framework-level wrapper.
+5. **README** — tightened the How to run section: `npx expo start --web` (Terminal 1), `node web-proxy.js` (Terminal 2), open `http://localhost:8082`, one-sentence explanation of why the proxy is required.
+
+---
+
