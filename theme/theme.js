@@ -7,6 +7,9 @@ export const Colors = {
   yellow: '#E8DC5A',
   pink: '#DFA0DB',
   blue: '#7C9CF0',
+  green: '#9CC76B',
+  orange: '#E08A3C',
+  red: '#DE5560',
   textMuted: '#555555',
   border: '#000000',
 };
@@ -19,41 +22,43 @@ export const Fonts = {
   bodyBold: 'Inter_700Bold',
 };
 
-// Chunky card: thick black border + hard offset shadow
+// Soft shadow — 2 px offset at ~25% black (replaces hard black offset)
+export const softShadow = {
+  shadowColor: '#000000',
+  shadowOffset: { width: 2, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 2,
+  elevation: 2,
+};
+
+// Card: 2 px border + soft shadow
 export const cardStyle = {
   backgroundColor: Colors.white,
   borderWidth: 2,
   borderColor: Colors.black,
   borderRadius: 4,
-  // Hard shadow — offset right+down, no blur
-  shadowColor: Colors.black,
-  shadowOffset: { width: 4, height: 4 },
-  shadowOpacity: 1,
-  shadowRadius: 0,
-  elevation: 4, // Android
+  ...softShadow,
   padding: 16,
   marginVertical: 8,
 };
 
-// Chunky button: same treatment
+// Button: pill-friendly base — minHeight 48, bold 17 px text, soft shadow
 export const buttonStyle = {
   backgroundColor: Colors.yellow,
   borderWidth: 2,
   borderColor: Colors.black,
   borderRadius: 4,
-  shadowColor: Colors.black,
-  shadowOffset: { width: 3, height: 3 },
-  shadowOpacity: 1,
-  shadowRadius: 0,
-  elevation: 3,
-  paddingVertical: 10,
+  ...softShadow,
+  minHeight: 48,
   paddingHorizontal: 20,
   alignItems: 'center',
+  justifyContent: 'center',
 };
 
 export const buttonTextStyle = {
   fontFamily: Fonts.bodyBold,
-  fontSize: 14,
+  fontSize: 17,
+  fontWeight: 'bold',
   color: Colors.black,
 };
 

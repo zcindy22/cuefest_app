@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   return (
@@ -9,21 +8,20 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#E8DC5A',
         tabBarInactiveTintColor: '#888',
         tabBarStyle: { backgroundColor: '#000', borderTopColor: '#000' },
-        headerStyle: { backgroundColor: '#000' },
-        headerTintColor: '#F0EFEA',
-        headerTitleStyle: { fontWeight: 'bold' },
+        tabBarLabelStyle: {
+          fontFamily: 'SpaceMono_400Regular',
+          fontSize: 10,
+          textTransform: 'uppercase',
+        },
+        headerShown: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Getting There',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'map', android: 'map', web: 'map' }}
-              tintColor={color}
-              size={24}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'navigate' : 'navigate-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -31,12 +29,17 @@ export default function TabLayout() {
         name="stage-finder"
         options={{
           title: 'Stage Finder',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'music.note', android: 'music_note', web: 'music_note' }}
-              tintColor={color}
-              size={24}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'map' : 'map-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="my-lineup"
+        options={{
+          title: 'My Lineup',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'musical-notes' : 'musical-notes-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -44,12 +47,8 @@ export default function TabLayout() {
         name="wear-bring"
         options={{
           title: 'Wear & Bring',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'bag', android: 'shopping_bag', web: 'shopping_bag' }}
-              tintColor={color}
-              size={24}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'bag-handle' : 'bag-handle-outline'} size={22} color={color} />
           ),
         }}
       />

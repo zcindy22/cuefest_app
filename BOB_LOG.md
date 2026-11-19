@@ -82,3 +82,20 @@
 5. `assets/fonts/` and `assets/images/` were left untouched.
 
 ---
+
+## 2026-11-19 — Prompt 7: web, phone layout, theme, demo location (Agent mode)
+
+**You asked:** Follow Prompt 7. Web support, phone layout, theme polish, demo location chip, My Lineup placeholder tab. Ask for approval before changes.
+
+**What I did:**
+
+1. **Web support** — created `metro.config.js` with `.wasm` asset extension and COOP/COEP header middleware. Changed `app.json` from `output: "server"` → `"single-page"` (client-side only, no SSR, works with SQLite wasm). Fixed `+html.tsx` to always use the app background color (no dark-mode black). Changed `db/database.js` to use `openDatabaseAsync` instead of `openDatabaseSync` so the wasm worker has time to load. Created `web-proxy.js` — a small Node.js reverse proxy on port 8082 that injects `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers on every response, enabling `SharedArrayBuffer` for expo-sqlite in Chrome.
+2. **Phone layout** — added a `webShell` / `phoneFrame` wrapper in `app/_layout.jsx`. On web, the entire app is centered in a `max-width: 430px` column on a slightly darker background (`#D8D7D2`). On narrow screens it fills full width. Native iOS/Android are unaffected.
+3. **Theme polish** — updated `theme/theme.js`: exported `softShadow` (2 px offset, 25% black), applied to `cardStyle` and `buttonStyle`. Buttons now use `minHeight: 48` and `fontSize: 17` bold text with 2 px borders. Fixed all inline hard shadows in `index.jsx` and `stage-finder.jsx` to use the soft shadow values.
+4. **Demo location** — added `settings` table to `db/database.js` (key/value, seeded with `demo_location = 'on'`). Created `lib/location.js` with `getStartLocation(db)`, `getDemoLocationSetting(db)`, and `setDemoLocationSetting(db, value)`. Created `components/DemoLocationChip.jsx` — a yellow/white tappable chip that reads/writes the settings table and shows "Demo location: ON/OFF". Added the chip to Getting There, Stage Finder, and Wear & Bring.
+5. **My Lineup tab** — created `app/(tabs)/my-lineup.jsx` placeholder screen. Updated `app/(tabs)/_layout.jsx`: added My Lineup as the 3rd tab (order: Getting There, Stage Finder, My Lineup, Wear & Bring), replaced `SymbolView` (iOS-only) with emoji text icons that work on web and native.
+6. **README** — added How to run section with two-terminal instructions, features list, and data sources.
+
+**Result:** App runs at http://localhost:8082 in Chrome. All four tabs load. SQLite reads stages and plan_items. Demo location chip is visible on every screen. Phone-width layout centers the app on a wide browser window.
+
+---

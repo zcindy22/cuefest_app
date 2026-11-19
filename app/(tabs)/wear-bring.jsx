@@ -7,6 +7,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { getDb } from '../../db/database';
 import { Colors, Fonts, headingStyle, labelStyle, bodyStyle, cardStyle } from '../../theme/theme';
+import DemoLocationChip from '../../components/DemoLocationChip';
 
 export default function WearAndBringScreen() {
   const [forecast, setForecast] = useState(null);
@@ -24,6 +25,7 @@ export default function WearAndBringScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.heading}>Wear &amp; Bring</Text>
+      <DemoLocationChip />
       <Text style={styles.badge}>⬤ SIMULATED FORECAST</Text>
       {forecast ? (
         <View style={styles.card}>

@@ -9,14 +9,14 @@ import * as SQLite from 'expo-sqlite';
 let db = null;
 
 export function getDb() {
-  if (!db) {
-    db = SQLite.openDatabaseSync('cue.db');
-  }
   return db;
 }
 
 export async function initDatabase() {
-  const database = getDb();
+  if (!db) {
+    db = await SQLite.openDatabaseAsync('cue.db');
+  }
+  const database = db;
 
   // Create tables
   database.execSync(`
@@ -91,6 +91,12 @@ export async function initDatabase() {
       transit_time TEXT DEFAULT '17:20',
       arrive_time TEXT DEFAULT '18:25',
       transit_status TEXT DEFAULT 'on_time'
+    );
+
+    -- App settings (key/value pairs)
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
   `);
 
@@ -235,6 +241,14 @@ export async function initDatabase() {
     database.runSync(
       `INSERT INTO replan_state (id, replans_used, leave_home, transit_time, arrive_time, transit_status)
        VALUES (1, 0, '17:00', '17:20', '18:25', 'on_time')`
+    );
+  }
+
+  // ── Seed settings (only if empty) ────────────────────────────────────────
+  const settingsCount = database.getFirstSync('SELECT COUNT(*) AS n FROM settings');
+  if (settingsCount.n === 0) {
+    database.runSync(
+      `INSERT INTO settings (key, value) VALUES ('demo_location', 'on')`
     );
   }
 }

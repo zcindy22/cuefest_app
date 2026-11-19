@@ -25,6 +25,7 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { getDb } from '../../db/database';
 import { runReplan, resetDemo } from '../../lib/replan';
+import DemoLocationChip from '../../components/DemoLocationChip';
 import {
   Colors,
   Fonts,
@@ -32,7 +33,6 @@ import {
   labelStyle,
   bodyStyle,
   cardStyle,
-  buttonStyle,
   buttonTextStyle,
 } from '../../theme/theme';
 
@@ -62,6 +62,8 @@ export default function GettingThereScreen() {
   const [lastReplan, setLastReplan] = useState(null);   // { reason, what_changed }
   const [destText, setDestText]     = useState('');     // directions dest input, never saved
   const [originText, setOriginText] = useState('');     // starting-from input, never saved
+  const [homeOpen, setHomeOpen]     = useState(false);  // collapsible: directions home
+  const [historyOpen, setHistoryOpen] = useState(false); // collapsible: replan history
 
   // ── Load from DB on focus ──────────────────────────────────────────────────
   useFocusEffect(
@@ -137,7 +139,6 @@ export default function GettingThereScreen() {
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const replansUsed  = state?.replans_used ?? 0;
-  const replansLeft  = 3 - replansUsed;
   const transitStatus = state?.transit_status ?? 'on_time';
   const isDelayed    = transitStatus === 'delayed';
 
@@ -147,23 +148,18 @@ export default function GettingThereScreen() {
       key: 'leave',
       time: state?.leave_home ?? '17:00',
       label: 'Leave home',
-      sub: replansUsed >= 1
-        ? '15 minutes earlier than planned'
-        : 'Head to the transit stop',
       dotColor: Colors.yellow,
     },
     {
       key: 'transit',
       time: state?.transit_time ?? '17:20',
       label: 'Take transit',
-      sub: 'Status is simulated',
       dotColor: Colors.yellow,
     },
     {
       key: 'arrive',
       time: state?.arrive_time ?? '18:25',
       label: 'Arrive at the entrance',
-      sub: 'Plan extra time for entry lines',
       dotColor: Colors.yellow,
     },
   ];
@@ -172,7 +168,6 @@ export default function GettingThereScreen() {
     key: `set_${item.id}`,
     time: item.start_time,
     label: `${item.act_name}${item.stage_name ? ', ' + item.stage_name : ''}`,
-    sub: `Walk from entrance: see Stage Finder`,
     dotColor: Colors.pink,
   }));
 
@@ -188,6 +183,16 @@ export default function GettingThereScreen() {
       <Text style={styles.appLabel}>CUE SAMPLE FESTIVAL DAY</Text>
       <Text style={styles.heading}>GETTING THERE</Text>
 
+      {/* Demo chip + transit badge on one row */}
+      <View style={styles.chipRow}>
+        <DemoLocationChip />
+        <View style={[styles.transitBadge, isDelayed && styles.transitBadgeDelayed]}>
+          <Text style={styles.transitBadgeText}>
+            TRANSIT: {isDelayed ? 'DELAYED' : 'ON TIME'} (SIMULATED)
+          </Text>
+        </View>
+      </View>
+
       {/* Latest replan card */}
       {lastReplan && (
         <View style={styles.replanCard}>
@@ -198,13 +203,6 @@ export default function GettingThereScreen() {
           <Text style={styles.replanBody}>{lastReplan.what_changed}</Text>
         </View>
       )}
-
-      {/* Transit status badge */}
-      <View style={[styles.transitBadge, isDelayed && styles.transitBadgeDelayed]}>
-        <Text style={styles.transitBadgeText}>
-          TRANSIT: {isDelayed ? 'DELAYED' : 'ON TIME'} (SIMULATED)
-        </Text>
-      </View>
 
       {/* Timeline */}
       <View style={styles.timeline}>
@@ -221,72 +219,73 @@ export default function GettingThereScreen() {
 
             {/* Label column */}
             <View style={styles.timelineTextCol}>
-              <Text style={styles.timelineLabel}>{row.label}</Text>
-              <Text style={styles.timelineSub}>{row.sub}</Text>
+              <Text style={styles.timelineLabel} numberOfLines={1}>{row.label}</Text>
             </View>
           </View>
         ))}
 
         {planItems.length === 0 && (
           <Text style={styles.emptyPlan}>
-            No sets added yet — go to Stage Finder to add one.
+            No sets yet. Add one in Stage Finder.
           </Text>
         )}
       </View>
 
-      {/* Starting from input */}
+      {/* Starting from + Open Directions — merged card */}
       <View style={styles.originCard}>
         <Text style={styles.cardTitle}>Starting from</Text>
-        <Text style={styles.cardSub}>
-          Optional. Leave blank to use your current location. Not saved.
-        </Text>
         <TextInput
           style={styles.textInput}
-          placeholder="e.g. New York, NY or 123 Main St"
+          placeholder="Leave blank for current location"
           placeholderTextColor={Colors.textMuted}
           value={originText}
           onChangeText={setOriginText}
           returnKeyType="done"
         />
-      </View>
-
-      {/* Open directions button */}
-      <TouchableOpacity style={styles.dirBtn} onPress={openDirectionsToFestival}>
-        <Text style={styles.dirBtnText}>OPEN DIRECTIONS IN GOOGLE MAPS</Text>
-      </TouchableOpacity>
-
-      {/* Directions home / next stop */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Directions home or next stop</Text>
-        <Text style={styles.cardSub}>
-          Type any address. Opens Google Maps from the festival entrance.
-          What you type is not saved.
-        </Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Address or place name"
-          placeholderTextColor={Colors.textMuted}
-          value={destText}
-          onChangeText={setDestText}
-          returnKeyType="done"
-        />
-        <TouchableOpacity style={styles.goBtn} onPress={openDirectionsHome}>
-          <Text style={styles.goBtnText}>GET DIRECTIONS</Text>
+        <TouchableOpacity style={styles.dirBtn} onPress={openDirectionsToFestival}>
+          <Text style={styles.dirBtnText}>OPEN DIRECTIONS IN GOOGLE MAPS</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Replan button */}
-      <TouchableOpacity
-        style={[styles.replanBtn, replansUsed >= 3 && styles.replanBtnDisabled]}
-        onPress={handleReplan}
-        disabled={replansUsed >= 3}
-      >
-        <Text style={styles.replanBtnText}>
-          {replansUsed >= 3
-            ? 'REPLAN (ALL 3 USED)'
-            : `REPLAN (${replansUsed} OF 3 USED)`}
-        </Text>
+      {/* Directions home / next stop — collapsible */}
+      <TouchableOpacity style={styles.collapseHeader} onPress={() => setHomeOpen(o => !o)}>
+        <Text style={styles.collapseHeaderText}>DIRECTIONS HOME OR NEXT STOP</Text>
+        <Text style={styles.caret}>{homeOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
+      {homeOpen && (
+        <View style={styles.collapseBody}>
+          <Text style={styles.cardSub}>
+            Opens Google Maps from the festival entrance. Not saved.
+          </Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Address or place name"
+            placeholderTextColor={Colors.textMuted}
+            value={destText}
+            onChangeText={setDestText}
+            returnKeyType="done"
+          />
+          <TouchableOpacity style={styles.goBtn} onPress={openDirectionsHome}>
+            <Text style={styles.goBtnText}>GET DIRECTIONS</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Replan row: button + counter */}
+      <View style={styles.replanRow}>
+        <TouchableOpacity
+          style={[styles.replanBtn, replansUsed >= 3 && styles.replanBtnDisabled]}
+          onPress={handleReplan}
+          disabled={replansUsed >= 3}
+        >
+          <Text style={styles.replanBtnText}>
+            {replansUsed >= 3 ? 'REPLAN (ALL 3 USED)' : 'REPLAN'}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.replanCounter}>
+          <Text style={styles.replanCounterText}>{replansUsed}/3 used</Text>
+        </View>
+      </View>
 
       {/* Reset demo button — only after all 3 replans */}
       {replansUsed >= 3 && (
@@ -295,16 +294,23 @@ export default function GettingThereScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Replan history */}
+      {/* Replan history — collapsible */}
       {replanLog.length > 0 && (
-        <View style={styles.historySection}>
-          <Text style={styles.historyTitle}>REPLAN HISTORY</Text>
-          {replanLog.map(r => (
-            <Text key={r.replan_number} style={styles.historyItem}>
-              {r.replan_number}. {r.reason} {r.what_changed}
-            </Text>
-          ))}
-        </View>
+        <>
+          <TouchableOpacity style={styles.collapseHeader} onPress={() => setHistoryOpen(o => !o)}>
+            <Text style={styles.collapseHeaderText}>REPLAN HISTORY</Text>
+            <Text style={styles.caret}>{historyOpen ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {historyOpen && (
+            <View style={styles.collapseBody}>
+              {replanLog.map(r => (
+                <Text key={r.replan_number} style={styles.historyItem}>
+                  {r.replan_number}. {r.reason} {r.what_changed}
+                </Text>
+              ))}
+            </View>
+          )}
+        </>
       )}
 
     </ScrollView>
@@ -331,44 +337,16 @@ const styles = StyleSheet.create({
   heading: {
     ...headingStyle,
     fontSize: 52,
-    marginBottom: 12,
-  },
-
-  // ── Replan card ──
-  replanCard: {
-    backgroundColor: Colors.pink,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  replanBadge: {
-    backgroundColor: Colors.black,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
     marginBottom: 8,
   },
-  replanBadgeText: {
-    ...labelStyle,
-    color: Colors.white,
-    fontSize: 11,
-  },
-  replanTitle: {
-    ...bodyStyle,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 17,
-    marginBottom: 4,
-  },
-  replanBody: {
-    ...bodyStyle,
-    fontSize: 14,
+
+  // ── Chip + badge row ──
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
   },
 
   // ── Transit badge ──
@@ -376,10 +354,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.blue,
     borderWidth: 2,
     borderColor: Colors.black,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   transitBadgeDelayed: {
     backgroundColor: Colors.pink,
@@ -390,31 +366,67 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
+  // ── Replan card ──
+  replanCard: {
+    backgroundColor: Colors.pink,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  replanBadge: {
+    backgroundColor: Colors.black,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
+  },
+  replanBadgeText: {
+    ...labelStyle,
+    color: Colors.white,
+    fontSize: 11,
+  },
+  replanTitle: {
+    ...bodyStyle,
+    fontFamily: Fonts.bodyBold,
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  replanBody: {
+    ...bodyStyle,
+    fontSize: 13,
+  },
+
   // ── Timeline ──
   timeline: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 0,
   },
   timeLabel: {
     ...labelStyle,
     fontFamily: Fonts.body,
-    fontSize: 13,
-    width: 70,
-    paddingTop: 2,
+    fontSize: 12,
+    width: 64,
+    paddingTop: 1,
     color: Colors.black,
   },
   dotCol: {
-    width: 32,
+    width: 28,
     alignItems: 'center',
   },
   dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 2,
     borderColor: Colors.black,
     zIndex: 1,
@@ -422,100 +434,142 @@ const styles = StyleSheet.create({
   line: {
     width: 2,
     flex: 1,
-    minHeight: 32,
+    minHeight: 15,
     backgroundColor: Colors.black,
-    marginTop: 0,
+    alignSelf: 'center',
   },
   timelineTextCol: {
     flex: 1,
-    paddingLeft: 8,
-    paddingBottom: 24,
+    paddingLeft: 6,
+    paddingBottom: 10,
   },
   timelineLabel: {
     ...bodyStyle,
     fontFamily: Fonts.bodyBold,
-    fontSize: 15,
-  },
-  timelineSub: {
-    ...bodyStyle,
     fontSize: 13,
-    color: Colors.textMuted,
-    marginTop: 2,
   },
   emptyPlan: {
     ...bodyStyle,
     color: Colors.textMuted,
     fontStyle: 'italic',
-    marginTop: 8,
-    paddingLeft: 102,
+    marginTop: 4,
+    paddingLeft: 92,
   },
 
-  // ── Directions to festival button ──
-  dirBtn: {
-    backgroundColor: Colors.yellow,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 4,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+  // ── Origin card (merged with directions button) ──
+  originCard: {
+    ...cardStyle,
+    marginBottom: 10,
+    marginVertical: 0,
   },
-  dirBtnText: {
-    ...buttonTextStyle,
-    fontFamily: Fonts.heading,
-    fontSize: 17,
-  },
-
-  // ── Directions card ──
-  card: { ...cardStyle, marginBottom: 12 },
-  originCard: { ...cardStyle, marginBottom: 10 },
-  cardTitle: { ...bodyStyle, fontFamily: Fonts.bodyBold, fontSize: 15, marginBottom: 4 },
-  cardSub:   { ...bodyStyle, fontSize: 13, color: Colors.textMuted, marginBottom: 10 },
+  cardTitle: { ...bodyStyle, fontFamily: Fonts.bodyBold, fontSize: 14, marginBottom: 6 },
+  cardSub:   { ...bodyStyle, fontSize: 12, color: Colors.textMuted, marginBottom: 8 },
   textInput: {
     borderWidth: 2,
     borderColor: Colors.black,
     borderRadius: 4,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     ...bodyStyle,
-    fontSize: 14,
-    marginBottom: 10,
+    fontSize: 13,
+    marginBottom: 8,
     backgroundColor: Colors.white,
   },
+
+  // ── Open directions button (inside card) ──
+  dirBtn: {
+    backgroundColor: Colors.yellow,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    borderRadius: 24,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dirBtnText: {
+    ...buttonTextStyle,
+    fontFamily: Fonts.heading,
+    fontSize: 15,
+  },
+
+  // ── Collapsible section header ──
+  collapseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    borderRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 2,
+    marginTop: 8,
+  },
+  collapseHeaderText: {
+    ...labelStyle,
+    fontSize: 11,
+  },
+  caret: {
+    ...labelStyle,
+    fontSize: 10,
+  },
+  collapseBody: {
+    backgroundColor: Colors.white,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    borderTopWidth: 0,
+    borderRadius: 4,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    padding: 12,
+    marginBottom: 4,
+  },
+
+  // ── GET DIRECTIONS button ──
   goBtn: {
     backgroundColor: Colors.blue,
     borderWidth: 2,
     borderColor: Colors.black,
     borderRadius: 4,
-    paddingVertical: 10,
+    minHeight: 44,
     alignItems: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  goBtnText: { ...buttonTextStyle, fontFamily: Fonts.heading, fontSize: 15 },
+  goBtnText: { ...buttonTextStyle, fontFamily: Fonts.heading, fontSize: 14 },
 
-  // ── Replan button ──
+  // ── Replan row ──
+  replanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 6,
+  },
   replanBtn: {
+    flex: 1,
     backgroundColor: Colors.black,
     borderWidth: 2,
     borderColor: Colors.black,
     borderRadius: 4,
-    paddingVertical: 14,
+    minHeight: 44,
     alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   replanBtnDisabled: {
     opacity: 0.4,
@@ -523,8 +577,20 @@ const styles = StyleSheet.create({
   replanBtnText: {
     ...buttonTextStyle,
     fontFamily: Fonts.heading,
-    fontSize: 17,
+    fontSize: 16,
     color: Colors.white,
+  },
+  replanCounter: {
+    backgroundColor: Colors.white,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  replanCounterText: {
+    ...labelStyle,
+    fontSize: 11,
   },
 
   // ── Reset button ──
@@ -533,37 +599,26 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.black,
     borderRadius: 4,
-    paddingVertical: 12,
+    minHeight: 44,
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   resetBtnText: {
     ...buttonTextStyle,
     fontFamily: Fonts.heading,
-    fontSize: 16,
+    fontSize: 15,
   },
 
   // ── Replan history ──
-  historySection: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.black,
-    paddingTop: 14,
-    marginTop: 4,
-  },
-  historyTitle: {
-    ...labelStyle,
-    fontFamily: Fonts.bodyBold,
-    fontSize: 11,
-    marginBottom: 8,
-  },
   historyItem: {
     ...bodyStyle,
-    fontSize: 13,
-    marginBottom: 6,
+    fontSize: 12,
+    marginBottom: 4,
   },
 });

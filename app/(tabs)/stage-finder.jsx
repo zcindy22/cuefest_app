@@ -32,6 +32,7 @@ import Svg, {
 import { useFocusEffect } from 'expo-router';
 import { getDb } from '../../db/database';
 import { calcRoute, getPosition, ENTRANCE } from '../../lib/routing';
+import DemoLocationChip from '../../components/DemoLocationChip';
 import {
   Colors,
   Fonts,
@@ -195,6 +196,7 @@ export default function StageFinderScreen() {
       {/* Header */}
       <Text style={styles.appLabel}>CUE SAMPLE FESTIVAL DAY</Text>
       <Text style={styles.heading}>STAGE FINDER</Text>
+      <DemoLocationChip />
       <Text style={styles.mapNote}>ILLUSTRATIVE MAP, NOT TO SCALE</Text>
 
       {/* Pick-start hint */}
@@ -433,11 +435,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.black,
     marginBottom: 16,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
     backgroundColor: '#F0EFEA',
   },
 
@@ -473,7 +475,6 @@ const styles = StyleSheet.create({
   btn: {
     ...buttonStyle,
     flex: 1,
-    paddingVertical: 12,
   },
   btnYellow: { backgroundColor: Colors.yellow },
   btnPink:   { backgroundColor: Colors.pink },
@@ -493,18 +494,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stageChip: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 2,
     borderColor: Colors.black,
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.black,
+    shadowColor: '#000000',
     shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
     elevation: 2,
   },
   stageChipSelected: { backgroundColor: Colors.yellow },
