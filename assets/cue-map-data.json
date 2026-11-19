@@ -1,0 +1,413 @@
+{
+  "note": "Illustrative map data for Cue. Coordinates are on an 800 by 900 map. Sample names only. Not an official map.",
+  "viewBox": [
+    0,
+    0,
+    800,
+    900
+  ],
+  "entrance": {
+    "x": 332,
+    "y": 757
+  },
+  "stages": [
+    {
+      "id": 1,
+      "name": "Stage 1",
+      "x": 435,
+      "y": 560
+    },
+    {
+      "id": 2,
+      "name": "Stage 2",
+      "x": 200,
+      "y": 640
+    },
+    {
+      "id": 3,
+      "name": "Stage 3",
+      "x": 150,
+      "y": 520
+    },
+    {
+      "id": 4,
+      "name": "Stage 4",
+      "x": 230,
+      "y": 460
+    },
+    {
+      "id": 5,
+      "name": "Stage 5",
+      "x": 85,
+      "y": 500
+    },
+    {
+      "id": 6,
+      "name": "Stage 6",
+      "x": 220,
+      "y": 260
+    },
+    {
+      "id": 7,
+      "name": "Stage 7",
+      "x": 420,
+      "y": 130
+    },
+    {
+      "id": 8,
+      "name": "Stage 8",
+      "x": 400,
+      "y": 220
+    },
+    {
+      "id": 9,
+      "name": "Stage 9",
+      "x": 480,
+      "y": 280
+    },
+    {
+      "id": 10,
+      "name": "Stage 10",
+      "x": 560,
+      "y": 230
+    },
+    {
+      "id": 11,
+      "name": "Stage 11",
+      "x": 590,
+      "y": 140
+    },
+    {
+      "id": 12,
+      "name": "Stage 12",
+      "x": 650,
+      "y": 520
+    },
+    {
+      "id": 13,
+      "name": "Stage 13",
+      "x": 680,
+      "y": 640
+    }
+  ],
+  "amenity_types": [
+    {
+      "key": "first_aid",
+      "label": "First aid",
+      "color": "#D9423E"
+    },
+    {
+      "key": "water",
+      "label": "Water",
+      "color": "#3E8BD9"
+    },
+    {
+      "key": "restroom",
+      "label": "Restrooms",
+      "color": "#2B2B6B"
+    },
+    {
+      "key": "food",
+      "label": "Food",
+      "color": "#E08A3C"
+    },
+    {
+      "key": "bar",
+      "label": "Cocktail bar",
+      "color": "#8A5BC7"
+    },
+    {
+      "key": "merch",
+      "label": "Merch",
+      "color": "#2B2B6B"
+    },
+    {
+      "key": "info",
+      "label": "Info",
+      "color": "#3E8BD9"
+    },
+    {
+      "key": "lost_found",
+      "label": "Lost and found",
+      "color": "#6B8E23"
+    },
+    {
+      "key": "lockers",
+      "label": "Lockers",
+      "color": "#C75B9E"
+    },
+    {
+      "key": "accessible",
+      "label": "Accessible viewing",
+      "color": "#2B6BD9"
+    },
+    {
+      "key": "box_office",
+      "label": "Box office",
+      "color": "#444444"
+    }
+  ],
+  "amenities": [
+    {
+      "type": "first_aid",
+      "x": 352,
+      "y": 292
+    },
+    {
+      "type": "food",
+      "x": 362,
+      "y": 118
+    },
+    {
+      "type": "food",
+      "x": 620,
+      "y": 300
+    },
+    {
+      "type": "restroom",
+      "x": 612,
+      "y": 196
+    },
+    {
+      "type": "restroom",
+      "x": 436,
+      "y": 312
+    },
+    {
+      "type": "water",
+      "x": 480,
+      "y": 170
+    },
+    {
+      "type": "bar",
+      "x": 365,
+      "y": 165
+    },
+    {
+      "type": "merch",
+      "x": 540,
+      "y": 300
+    },
+    {
+      "type": "accessible",
+      "x": 372,
+      "y": 262
+    },
+    {
+      "type": "info",
+      "x": 520,
+      "y": 112
+    },
+    {
+      "type": "food",
+      "x": 172,
+      "y": 214
+    },
+    {
+      "type": "food",
+      "x": 266,
+      "y": 306
+    },
+    {
+      "type": "restroom",
+      "x": 172,
+      "y": 306
+    },
+    {
+      "type": "water",
+      "x": 266,
+      "y": 218
+    },
+    {
+      "type": "bar",
+      "x": 120,
+      "y": 436
+    },
+    {
+      "type": "lockers",
+      "x": 60,
+      "y": 440
+    },
+    {
+      "type": "restroom",
+      "x": 90,
+      "y": 600
+    },
+    {
+      "type": "food",
+      "x": 262,
+      "y": 574
+    },
+    {
+      "type": "first_aid",
+      "x": 262,
+      "y": 690
+    },
+    {
+      "type": "water",
+      "x": 120,
+      "y": 690
+    },
+    {
+      "type": "accessible",
+      "x": 262,
+      "y": 630
+    },
+    {
+      "type": "merch",
+      "x": 150,
+      "y": 586
+    },
+    {
+      "type": "first_aid",
+      "x": 508,
+      "y": 432
+    },
+    {
+      "type": "water",
+      "x": 360,
+      "y": 500
+    },
+    {
+      "type": "restroom",
+      "x": 352,
+      "y": 604
+    },
+    {
+      "type": "food",
+      "x": 508,
+      "y": 500
+    },
+    {
+      "type": "accessible",
+      "x": 508,
+      "y": 604
+    },
+    {
+      "type": "merch",
+      "x": 392,
+      "y": 436
+    },
+    {
+      "type": "lockers",
+      "x": 470,
+      "y": 690
+    },
+    {
+      "type": "lost_found",
+      "x": 510,
+      "y": 690
+    },
+    {
+      "type": "info",
+      "x": 352,
+      "y": 436
+    },
+    {
+      "type": "bar",
+      "x": 480,
+      "y": 436
+    },
+    {
+      "type": "restroom",
+      "x": 612,
+      "y": 440
+    },
+    {
+      "type": "food",
+      "x": 730,
+      "y": 450
+    },
+    {
+      "type": "food",
+      "x": 612,
+      "y": 590
+    },
+    {
+      "type": "water",
+      "x": 730,
+      "y": 580
+    },
+    {
+      "type": "first_aid",
+      "x": 730,
+      "y": 690
+    },
+    {
+      "type": "bar",
+      "x": 612,
+      "y": 690
+    },
+    {
+      "type": "merch",
+      "x": 730,
+      "y": 520
+    },
+    {
+      "type": "box_office",
+      "x": 436,
+      "y": 750
+    },
+    {
+      "type": "info",
+      "x": 232,
+      "y": 750
+    }
+  ],
+  "streets_routable": {
+    "horizontal": [
+      {
+        "name": "NW 5th Ave",
+        "y": 365,
+        "x1": 30,
+        "x2": 770
+      },
+      {
+        "name": "NW 6th Ave",
+        "y": 750,
+        "x1": 30,
+        "x2": 770
+      }
+    ],
+    "vertical": [
+      {
+        "name": "NW 23rd St",
+        "x": 310,
+        "y1": 90,
+        "y2": 750
+      },
+      {
+        "name": "NW 22nd St",
+        "x": 560,
+        "y1": 365,
+        "y2": 750
+      }
+    ],
+    "decorative_only": [
+      "NW 24th St",
+      "NW 25th St",
+      "NW 22nd Ln"
+    ]
+  },
+  "geo": {
+    "note": "Approximate. Cindy must paste the real lat and lng of the middle of the festival site. Do not guess.",
+    "center_latlng": null,
+    "schematic_center_xy": [
+      400,
+      450
+    ],
+    "meters_per_map_unit": 0.6,
+    "orientation": "In this layout, up on the map is EAST and right on the map is SOUTH (north points left).",
+    "formulas": {
+      "east_m": "(450 - y) * meters_per_map_unit",
+      "north_m": "-(x - 400) * meters_per_map_unit",
+      "lat": "center_lat + north_m / 111320",
+      "lng": "center_lng + east_m / (111320 * cos(center_lat in radians))"
+    },
+    "demo_hotel_xy": [
+      332,
+      1000
+    ],
+    "demo_hotel_label": "Demo hotel (sample)"
+  }
+}

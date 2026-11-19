@@ -1,0 +1,35 @@
+id,name,genre,subgenre,stage,day,start,end,bio
+1,Solstice Parade,Dance,House,1,Fri,18:30,19:45,Sunset house with live percussion and a big singalong finish.
+2,Kora Nightfall,Dance,Disco,1,Fri,20:00,21:15,Glittery disco edits built for a packed main stage.
+3,DJ Paper Moon,Dance,Tech house,2,Fri,19:00,20:30,Rolling tech house with deep basslines and tight transitions.
+4,Saffron Static,Dance,House,2,Fri,21:00,22:30,"Warm, groovy house that keeps the dance floor moving."
+5,Halcyon Drift,Techno,Melodic,3,Fri,20:00,21:30,Dreamy melodic techno with slow building synth layers.
+6,Acid Lantern,Techno,Acid,3,Fri,22:00,23:30,Squelchy acid lines and hard hitting late night energy.
+7,Ruin Cathedral,Techno,Peak time,4,Fri,21:30,23:00,Driving peak time techno made for the loudest hour of the night.
+8,Tidewave Collective,Bass,Drum and bass,5,Fri,19:30,21:00,"Fast breakbeats, rolling basslines and a lot of crowd energy."
+9,Mira Solano,Latin,Reggaeton,6,Fri,18:00,19:15,Bright reggaeton with big hooks and a dance party feel.
+10,Cobalt Weather,Indie,Indie dance,7,Fri,19:00,20:15,Guitar and synth indie dance that is easy to sing and move to.
+11,Lune Atlas,Alt R&B,Neo soul,8,Fri,20:30,21:45,Smooth neo soul with jazzy chords and a late evening glow.
+12,Velour Hours,Alt R&B,Dark R&B,8,Fri,22:00,23:00,"Moody, slow burning R&B with heavy low end."
+13,Grit Machine,Bass,Dubstep,9,Fri,22:00,23:15,Heavy dubstep with big drops and a lot of bass.
+14,Neon Anchor,Electro,Synthwave,10,Fri,20:00,21:15,Retro synthwave with cinematic leads and steady drive.
+15,Ode to Pavement,Hip hop,Boom bap,11,Fri,19:30,20:45,Classic boom bap beats with sharp rhymes and live scratching.
+16,Rumba Electrica,Latin,Dembow,12,Fri,21:00,22:15,Fast dembow rhythms mixed with electronic percussion.
+17,Plastic Garden,Indie,Dream pop,13,Fri,18:30,19:45,Hazy dream pop with soft vocals and shimmering guitars.
+18,Golden Hour Syndicate,Dance,House,1,Sat,19:00,20:30,"Feel good house built around vocals, piano and sunshine."
+19,Mono Palace,Dance,Tech house,1,Sat,21:30,23:00,Punchy tech house with a late night club sound.
+20,Juno Vega,Latin,Latin house,2,Sat,18:30,19:45,"Latin house with percussion, brass and a summer vibe."
+21,The Midnight Fold,Indie,Indie rock,3,Sat,19:00,20:15,"Loud, melodic indie rock with big choruses."
+22,Breaker Saints,Electro,Breaks,4,Sat,20:00,21:15,Choppy breakbeats and electro basslines with lots of swagger.
+23,Hollow Meridian,Bass,Drum and bass,4,Sat,22:00,23:30,"Dark, fast drum and bass for the late crowd."
+24,Static Orchard,Techno,Melodic,5,Sat,21:00,22:30,Atmospheric melodic techno with slow rising tension.
+25,Low Tide Choir,Alt R&B,Lo fi soul,6,Sat,20:00,21:00,"Dusty, lo fi soul with layered vocals and mellow beats."
+26,Bloom Season,Dance,House,6,Sat,22:00,23:15,Uplifting house with garden party warmth.
+27,Vanta Bloom,Techno,Peak time,7,Sat,22:00,23:30,"Relentless peak time techno with a dark, hypnotic pulse."
+28,Prism Kids,Electro,Electro pop,8,Sat,19:30,20:45,Glossy electro pop with bright hooks and neon energy.
+29,Pulse Cartel,Bass,Garage,9,Sat,20:30,21:45,Skippy UK style garage with deep sub bass.
+30,Tangerine Static,Bass,Dubstep,9,Sat,22:15,23:30,Wobbly dubstep with playful sound design and huge drops.
+31,Ember Quarter,Hip hop,Rap,10,Sat,19:30,20:45,Sharp lyrical rap over minimal beats.
+32,Cielo Rojo,Latin,Reggaeton,11,Sat,20:00,21:15,Smooth reggaeton with romantic hooks and a big dance break.
+33,Frostbite Disco,Dance,Disco,12,Sat,21:30,23:00,Cool disco with funky bass and bright strings.
+34,Sidewalk Oracle,Hip hop,Trap,13,Sat,20:45,22:00,Heavy trap beats with a rowdy crowd call and response.
