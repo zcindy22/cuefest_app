@@ -1,5 +1,24 @@
 # BOB_LOG.md — Cue app build log
 
+
+## 2026-11-19 — Prompt 0: Restyle (cue-bob-prompts-v3.md)
+
+**You asked:** Read cue-bob-prompts-v3.md, unzip cue-assets-v3.zip, follow Rules for every task and Prompt 0 only.
+
+**What I did:**
+
+1. Unzipped `cue-assets-v3.zip` → placed `cue-festival-map-v3.svg`, `cue-festival-map-v3.png`, `cue-map-data.json`, `cue-sample-lineup.csv` in `assets/`. Saved `cue-bob-prompts-v3.md` to project root.
+2. Deleted old files: `assets/cue-festival-map-v2.png`, `assets/cue-festival-map-v2.svg`, `assets/fonts/SpaceMono-Regular.ttf`, `cue-bob-prompts.md`.
+3. Uninstalled `@expo-google-fonts/bebas-neue`, `@expo-google-fonts/inter`, `@expo-google-fonts/space-mono`.
+4. Installed `@expo-google-fonts/bricolage-grotesque`, `@expo-google-fonts/dm-sans`, `@expo-google-fonts/nunito`.
+5. Rewrote `theme/theme.js` — new palette (#FFFAF2 bg, #1B1B22 ink, #FF7EB6 pink, #6FA8FF blue, #FFD84A yellow, etc.), three font families (Display/Body/Detail), 1.5px ink outlines, r16–100 radii, no shadows, full type scale (min 12).
+6. Updated `app/_layout.jsx` — loads BricolageGrotesque_800ExtraBold, DMSans_400Regular/500Medium/700Bold, Nunito_600SemiBold/700Bold; removed old three font imports.
+7. Rebuilt `app/(tabs)/_layout.jsx` — white bg + 1.5px ink top border; inactive tabs icon-only in muted gray; active tab = yellow outlined pill with icon + label (Display 14); tabs renamed Lineup, Discover, Map, Wear; Ionicons: calendar, sparkles, map, shirt.
+8. Updated all inline styles in `index.jsx`, `my-lineup.jsx`, `stage-finder.jsx`, `wear-bring.jsx`, and `components/DemoLocationChip.jsx` — new colors, font names, sizes (all ≥13), 1.5px outlines, pill radii, removed all shadows, added `useSafeAreaInsets` and 20px side padding.
+
+---
+
+
 ---
 
 ## 2026-11-18 — Prompt 1: Plan (Plan mode)
@@ -113,4 +132,109 @@
 5. **README** — tightened the How to run section: `npx expo start --web` (Terminal 1), `node web-proxy.js` (Terminal 2), open `http://localhost:8082`, one-sentence explanation of why the proxy is required.
 
 ---
+
+
+## 2026-11-19 — Prompt 10: My Lineup screen (Agent mode)
+
+**You asked:** Follow Prompt 10. Migrate the sets table to 34 CSV acts, add taste/lineup tables, build the full My Lineup screen (Discover, Swipe, Matches, Timeline). Saturday acts only for Add to plan. Friday acts saveable but not plan-able. Use lineup_version flag in settings to control migration.
+
+**What was cleared during migration (lineup_version gate):**
+- `plan_items` — all rows (act copies tied to old set ids 1–39)
+- `replan_log` — all rows (replan history tied to the old plan)
+- `replan_state` — reset to replans_used=0, leave_home 17:00, transit_time 17:20, arrive_time 18:25, on_time
+- `sets` — all 39 old generic "Sample Act N-M" rows replaced with 34 CSV rows (IDs 1–34)
+
+**What I did:**
+
+1. **`db/database.js`** — Changed `sets` from `AUTOINCREMENT` to plain `INTEGER PRIMARY KEY` so CSV ids 1–34 are preserved. Added `genre`, `subgenre`, `bio`, `day` columns (with `ALTER TABLE … ADD COLUMN` guards for existing DBs). Added three new tables: `taste_picks`, `swipes`, `saved_acts`. Added version-gated migration block: checks `settings.lineup_version = '1'`; if absent, clears `plan_items`, `replan_log`, resets `replan_state`, deletes old sets, inserts 34 CSV acts, then sets the flag. All 34 act times are `HH:MM` 24-hour — matching existing code throughout.
+2. **`app/(tabs)/my-lineup.jsx`** — Full My Lineup screen replacing the placeholder:
+   - **Discover** tab: 8 genre bubbles sized by act count (flex-wrap, no library). Tap to drill into subgenre bubbles. Tap a subgenre to toggle a pick (thick border + checkmark). Back button, picks chips, See My Matches button, Clear My Taste button.
+   - **Swipe** tab: stack of up to 8 act cards (mostly from picked genres). Drag right/left or tap Like/Skip. `PanResponder` + `Animated` with button fallback. Saves to `swipes` table; likes also save to `saved_acts`.
+   - **Matches** tab: all 34 acts scored and sorted. +3 subgenre pick, +1 genre pick, +2 liked subgenre, −1 skipped subgenre. "Simple rules, not AI" badge. Festival persona card (Wanderer / Purist / Mixer). Heart to save, ADD button for Saturday acts.
+   - **Timeline** tab: Fri/Sat switch. Saved acts for the selected day as stage columns on a 17:00–24:00 vertical axis, scrollable sideways. Overlap detection (red border + ⚠). +PLAN button for Saturday. Friday banner note.
+   - **Artist detail** overlay: initials tile, genre chip, subgenre, stage/day/time, bio, "sample act" note. Save, Add to plan (Sat only), Find on Map (writes `open_stage` to settings, navigates to Stage Finder tab).
+3. **Stage Finder unaffected** — only selects the original 5 `sets` columns; migration is additive. Confirmed no reference to new columns.
+4. **Replans unaffected** — `lib/replan.js` never reads `sets`. Confirmed.
+
+---
+
+
+## 2026-11-19 — Prompt 10: Discover screen
+
+**You asked:** Rebuild my-lineup.jsx as the Discover screen with glow bubbles, act card with Like/Skip, Matches tab with scored ranking, and ArtistCard component. Show migration plan first, then go.
+
+**What I did:**
+
+1. Confirmed no new DB migration needed — `sets` already has all 34 CSV acts with `genre`, `subgenre`, `bio`, `day`; `taste_picks`, `swipes`, `saved_acts` tables already exist; `lineup_version = '1'` gate already applied.
+2. Noted `plan_items` stores copies of set data (act_name, start_time, etc.), not just set_ids — Lineup (Prompt 8) will handle the merge.
+3. Created `components/ArtistCard.jsx` — reusable bottom-sheet modal (React Native Modal, slide animation) with initials tile, name, genre + subgenre chips, stage/day/time, bio, sample note, Save heart and Find on map button.
+4. Rewrote `app/(tabs)/my-lineup.jsx`:
+   - Replaced 4-tab layout (Discover | Swipe | Matches | Timeline) with 2-tab layout (Discover | Matches).
+   - Discover tab: 8 genre glow bubbles via react-native-svg RadialGradient (soft edges, deep-shade ring, staggered flex-wrap, tap area ≥56px). Tapping a genre springs into subgenre bubbles (bloom animation via `Animated.spring`). Tapping a subgenre picks it (ink dot + bold label). Back link returns to genres. Act card with Like/Skip appears below bubbles once a subgenre is picked. Friday acts show "Plan covers Saturday" note.
+   - Matches tab: 34 acts scored and ranked, with why line and heart to save to `saved_acts`. "Simple rules, not AI" label.
+   - ArtistCard bottom sheet replaces the old `ArtistDetail` inline overlay. Find on map writes `open_stage` to settings and navigates to stage-finder.
+   - Timeline tab removed from this screen (moves to Lineup in Prompt 8). `addToPlan`/`alreadyInPlan` removed from this screen.
+
+
+## 2026-11-19 — Tab bar fix + Prompt 8: Lineup page
+
+**You asked:** Fix active tab label clipping ("Lir" instead of "Lineup"), then rebuild index.jsx as the Lineup page.
+
+**Tab bar fix (app/(tabs)/_layout.jsx):**
+Removed `minWidth: 44`, added `alignSelf: 'center'` on the pill and `flexShrink: 0` on the label, `numberOfLines={1}`, and increased `paddingHorizontal` to 14. Pill now sizes to its content and all four labels show in full.
+
+**What I did (Prompt 8):**
+
+1. Created `components/ScheduleTimeline.jsx` — horizontal-scroll grid, one column per stage, 76px/hour time axis (17:00–24:00), 205px wide act blocks (min 76px tall, 64px minimum for short sets), colored initials tile (40px), Display 16 act name wrapping to 2 lines, Nunito 13 genre+time line, heart bottom-right. Saved acts get blue/pink tinted fill.
+2. Rewrote `app/(tabs)/index.jsx` as `LineupScreen`:
+   - **Header**: "Lineup" title + pale yellow "Sample day" pill + round yellow 40px navigate button (Ionicons `navigate-outline`), right-aligned, 10px gap.
+   - **Day tabs**: Friday / Saturday in Display 24/28, Saturday default, pink underline on active.
+   - **Segmented control**: Timeline | Saved | All acts.
+   - **Timeline view**: renders `ScheduleTimeline` with all acts for the selected day.
+   - **Saved view**: merges `saved_acts` and `plan_items` by `set_id` (no duplicates), time ordered, overlap chip, empty state → Discover button.
+   - **All acts view**: flat list sorted by start time, hearts write to `saved_acts`.
+   - **Directions**: `Linking.openURL` to Google Maps — adds `origin=Wynwood%2C%20Miami%2C%20FL` when Demo location is ON, no origin when OFF. No sheet, picker or input.
+   - **Demo location row** at the very bottom, toggle ON/OFF pill.
+   - **Removed from view**: commute timeline, transit badge, Replan button, replan history, Reset demo, Starting from card, Directions home card. Replan code and tables untouched.
+3. No floating gear button found in the original code — nothing to remove.
+
+**Bugs fixed:**
+- `no-use-before-define` lint error: `useFocusEffect` was calling `loadAll` before it was declared. Fixed by moving `useFocusEffect` call after `loadAll`.
+- Unused `labelStyle` import in both files removed.
+
+
+## 2026-11-19 — Prompt 9: Stage finder map rebuild
+
+**You asked:** Rebuild the Stage finder map from cue-map-data.json and cue-festival-map-v3.svg, with amenity icons, legend chips, Find nearest, and routing from any start to any stage or amenity.
+
+**What I did:**
+
+1. **`lib/routing.js`** — Added `AMENITIES` export (41 amenity positions matching cue-map-data.json), updated `getPosition()` to handle `amenity_N` ids, added `findNearestAmenity(startPos, type, startLabel)` which runs `calcRoute` to every amenity of a type and returns the nearest one with its route.
+2. **`app/(tabs)/stage-finder.jsx`** — Full rebuild:
+   - SVG map matches cue-festival-map-v3.svg: v3 block colors (yellow #FFE680, blue #C5DAFF, pink #FFC9E1, pale yellow #FFF0A8, light blue #D4E3FF), decorative side streets, dashed centerlines, street name labels (NW 5th Ave, NW 6th Ave, NW 23rd St, NW 22nd St plus three decorative names), 23 greenery circles, entrance tag, VIP ENTRY and VIP+ ENTRY tags, compass, 41 amenity icons with their SVG glyphs, 13 tappable stage pins.
+   - Amenity chips scroll horizontally below the map, one per type with a colored dot. Tapping a chip toggles that type's visibility. Each chip has a "Find nearest" button that highlights the nearest amenity of that type and shows a route from the current start.
+   - Nearest result banner shows the amenity type, start label, and simulated walk time.
+   - Stage pin tap shows a card with Saturday-only acts (filtered by `day = 'Sat'`), genre+subgenre line, route, Add to my plan button with overlap check. Tapping an act name opens ArtistCard.
+   - Pick start button: defaults to Entrance, tap a stage pin to change.
+   - ArtistCard integrated from components/ArtistCard.jsx with save/unsave wired to saved_acts.
+   - All text ≥13px, Display font for headings and act names, Nunito for times/genre, theme colors throughout.
+
+---
+
+## 2026-11-19 — Prompt 5: Wear and bring screen
+
+**You asked:** Build the full Wear and bring screen with forecast, packing checklist, leave at home list, Attendee Picks accordion with filter+hashtag chips and seeded posts, add your own tip. Pull prompts from cue-bob-prompts-v3.md.
+
+**What I did:**
+
+1. **`db/database.js`** — Added `type` and `tags` columns to the `tips` table (via `ALTER TABLE` guards for existing DBs). Version-gated re-seed under `tips_version = '1'`: deletes old 6-row seed and replaces with 19 rows — 6 sourced tips (with source links), 6 sample tips, 4 fits and 3 reviews. Each row has `type` (tip/fit/review) and hashtag `tags`. Fits encode `title|pieces` in `tip_text`; reviews encode `text|verdict`.
+
+2. **`app/(tabs)/wear-bring.jsx`** — Full rebuild:
+   - **Forecast card**: condition, temp, rain chance with Ionicons icon and a `wearSuggestion()` helper that picks outfit advice based on the data. "Simulated" chip.
+   - **Packing list**: scrollable rows with ink checkbox, label, checked/unchecked strike-through. User-added items show a pink "Mine" chip and an × to remove. Round outlined + button at the heading opens an inline text input + Add button. Items from Attendee Picks land here too via `addToPackingFromTip()`.
+   - **Leave at home**: static list with pink ✕ icon per row.
+   - **Attendee Picks accordion**: collapsed by default, tap to expand. Shows count chip + chevron. When open: disclaimer note, Last updated date, filter chips (All / Tips / Fits / Reviews), top-8 hashtag chips (computed from tag frequency), feed of tip cards (first 4 + Show more), Add your own tip form.
+   - **Tip cards**: tips show body + source link or Sample badge + Add to my list; fits show icon tile, title, pieces; reviews show body + verdict chip (blue Worth it / yellow Mixed / pink Skip it).
+   - **Add your own tip**: text + hashtags fields, saves to `tips` with `source_name = 'My tip'`, stays on device.
+   - Removed `DemoLocationChip` (was left over from old screen).
 
