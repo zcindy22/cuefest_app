@@ -9,7 +9,7 @@
  * - ArtistCard for act detail
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -93,6 +93,122 @@ function polylineStr(pts) {
 
 function amenityColor(type) {
   return AMENITY_TYPES.find(t => t.key === type)?.color ?? '#888';
+}
+
+// ─── Walking dot helpers ──────────────────────────────────────────────────
+
+/**
+ * Interpolate a position along a polyline at progress t (0–1).
+ * Returns { x, y }.
+ */
+function interpolatePolyline(polyline, t) {
+  if (!polyline || polyline.length === 0) return { x: 0, y: 0 };
+  if (polyline.length === 1) return { x: polyline[0][0], y: polyline[0][1] };
+  if (t <= 0) return { x: polyline[0][0], y: polyline[0][1] };
+  if (t >= 1) return { x: polyline[polyline.length - 1][0], y: polyline[polyline.length - 1][1] };
+
+  // Compute total length and per-segment lengths
+  const segLens = [];
+  let total = 0;
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const dx = polyline[i + 1][0] - polyline[i][0];
+    const dy = polyline[i + 1][1] - polyline[i][1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    segLens.push(len);
+    total += len;
+  }
+
+  const target = t * total;
+  let accumulated = 0;
+  for (let i = 0; i < segLens.length; i++) {
+    if (accumulated + segLens[i] >= target) {
+      const frac = segLens[i] > 0 ? (target - accumulated) / segLens[i] : 0;
+      return {
+        x: polyline[i][0] + frac * (polyline[i + 1][0] - polyline[i][0]),
+        y: polyline[i][1] + frac * (polyline[i + 1][1] - polyline[i][1]),
+      };
+    }
+    accumulated += segLens[i];
+  }
+  return { x: polyline[polyline.length - 1][0], y: polyline[polyline.length - 1][1] };
+}
+
+/**
+ * Compute cumulative progress fractions for each interior waypoint.
+ * Used to assign thresholds to steps.
+ */
+function polylineSegFractions(polyline) {
+  if (!polyline || polyline.length < 2) return [];
+  const segLens = [];
+  let total = 0;
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const dx = polyline[i + 1][0] - polyline[i][0];
+    const dy = polyline[i + 1][1] - polyline[i][1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    segLens.push(len);
+    total += len;
+  }
+  if (total === 0) return [];
+  let acc = 0;
+  return segLens.map(l => { acc += l; return acc / total; });
+}
+
+const LANDMARK_THRESHOLD = 180; // map units
+
+/**
+ * Build 2–4 step strings from a polyline, naming turns after nearby landmarks.
+ * Returns [{ threshold: 0–1, text: string }, ...]
+ */
+function buildSteps(polyline, destStageId, stages, amenityTypes) {
+  if (!polyline || polyline.length < 2) return [];
+
+  // Fractions at which each segment ends
+  const fracs = polylineSegFractions(polyline);
+  // Interior waypoints are indices 1..length-2
+  const interiorIndices = [];
+  for (let i = 1; i < polyline.length - 1; i++) interiorIndices.push(i);
+
+  const destStage = stages.find(s => s.id === destStageId);
+  const destName = destStage ? destStage.name : `Stage ${destStageId}`;
+
+  const steps = [];
+
+  for (const idx of interiorIndices) {
+    const pt = { x: polyline[idx][0], y: polyline[idx][1] };
+    const fraction = fracs[idx - 1]; // fraction at end of segment idx-1 (arriving at this point)
+
+    // Find nearest named stage
+    let nearestName = null;
+    let nearestDist = LANDMARK_THRESHOLD;
+    for (const s of stages) {
+      if (s.id === destStageId) continue;
+      const d = Math.sqrt((s.x - pt.x) ** 2 + (s.y - pt.y) ** 2);
+      if (d < nearestDist) { nearestDist = d; nearestName = s.name; }
+    }
+    // Fall back to amenity type label
+    if (!nearestName) {
+      for (const a of AMENITIES) {
+        const d = Math.sqrt((a.x - pt.x) ** 2 + (a.y - pt.y) ** 2);
+        if (d < nearestDist) {
+          nearestDist = d;
+          const typeEntry = amenityTypes.find(t => t.key === a.type);
+          nearestName = typeEntry ? typeEntry.label : a.type;
+        }
+      }
+    }
+
+    const text = nearestName
+      ? `Continue past ${nearestName}`
+      : 'Continue along the street';
+
+    steps.push({ threshold: fraction, text });
+    if (steps.length >= 3) break; // cap at 3 turn steps + 1 final
+  }
+
+  // Final "ahead" step at 75% progress
+  steps.push({ threshold: 0.75, text: `${destName} is ahead` });
+
+  return steps;
 }
 
 // ─── Amenity icon shapes (SVG paths/elements, centered at 0,0) ────────────
@@ -182,40 +298,65 @@ export default function StageFinderScreen() {
   // Artist card
   const [openAct, setOpenAct] = useState(null);
 
-  // Load DB on focus
+  // Walking dot
+  const [walkProgress, setWalkProgress] = useState(null); // null = not walking, 0–1 = walking/arrived
+  const walkIntervalRef = useRef(null);
+  const walkStepsRef    = useRef([]);   // [{ threshold, text }] computed once per Walk tap
+
+  // Load DB on focus — also reads open_stage from settings (set by Find on map)
   useFocusEffect(
     useCallback(() => {
       const db = getDb();
-      setStages(db.getAllSync('SELECT id, name, x, y FROM stages ORDER BY id'));
+      const loadedStages = db.getAllSync('SELECT id, name, x, y FROM stages ORDER BY id');
+      setStages(loadedStages);
       // Saturday acts only for the stage card and plan
       setSets(db.getAllSync(
         "SELECT id, stage_id, act_name, start_time, end_time, genre, subgenre, bio, day FROM sets WHERE day = 'Sat' ORDER BY stage_id, start_time"
       ));
       setPlanItems(db.getAllSync('SELECT id, set_id, start_time, end_time FROM plan_items'));
       setSavedActIds(db.getAllSync('SELECT act_id FROM saved_acts').map(r => r.act_id));
+
+      // Handle open_stage from Find on map (Discover / Lineup)
+      const openStageSetting = db.getFirstSync(
+        "SELECT value FROM settings WHERE key = 'open_stage'"
+      );
+      if (openStageSetting && openStageSetting.value) {
+        const stageId = parseInt(openStageSetting.value, 10);
+        if (stageId >= 1 && stageId <= 13) {
+          // Clear the flag first
+          db.runSync("UPDATE settings SET value = '' WHERE key = 'open_stage'");
+          // Select the stage and compute route using current startId
+          const curStartId = startId; // captured from closure
+          const startPos = curStartId === 'entrance'
+            ? { x: ENTRANCE.x, y: ENTRANCE.y }
+            : getPosition(curStartId);
+          const destPos = getPosition(stageId);
+          if (startPos && destPos) {
+            const sLabel = curStartId === 'entrance' ? 'entrance' : `stage_${curStartId}`;
+            const dLabel = `stage_${stageId}`;
+            const newRoute = sLabel !== dLabel
+              ? calcRoute(startPos, destPos, sLabel, dLabel)
+              : { polyline: [[destPos.x, destPos.y]], minutes: 0 };
+            setSelectedPin(stageId);
+            setSelectedSetIdx(0);
+            setNearestResult(null);
+            setHighlightedAmenity(null);
+            stopWalk();
+            setRoute(newRoute);
+          }
+        }
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
-  // ── Pin tap ──────────────────────────────────────────────────────────────
-  function handlePinTap(stageId) {
+  // ── selectStage: shared logic for pin tap and open_stage ─────────────────
+  function selectStage(stageId) {
     setNearestResult(null);
     setHighlightedAmenity(null);
-
-    if (pickingStart) {
-      setStartId(stageId);
-      setPickingStart(false);
-      if (selectedPin) {
-        const dest  = getPosition(selectedPin);
-        const start = getPosition(stageId);
-        if (dest && start) {
-          setRoute(calcRoute(start, dest, `stage_${stageId}`, `stage_${selectedPin}`));
-        }
-      }
-      return;
-    }
-
     setSelectedPin(stageId);
     setSelectedSetIdx(0);
+    stopWalk();
 
     const startPos = startId === 'entrance'
       ? { x: ENTRANCE.x, y: ENTRANCE.y }
@@ -231,6 +372,54 @@ export default function StageFinderScreen() {
         setRoute({ polyline: [[destPos.x, destPos.y]], minutes: 0 });
       }
     }
+  }
+
+  // ── Pin tap ──────────────────────────────────────────────────────────────
+  function handlePinTap(stageId) {
+    if (pickingStart) {
+      setStartId(stageId);
+      setPickingStart(false);
+      stopWalk();
+      if (selectedPin) {
+        const dest  = getPosition(selectedPin);
+        const start = getPosition(stageId);
+        if (dest && start) {
+          setRoute(calcRoute(start, dest, `stage_${stageId}`, `stage_${selectedPin}`));
+        }
+      }
+      return;
+    }
+    selectStage(stageId);
+  }
+
+  // ── Walk / Stop ───────────────────────────────────────────────────────────
+  function stopWalk() {
+    if (walkIntervalRef.current) {
+      clearInterval(walkIntervalRef.current);
+      walkIntervalRef.current = null;
+    }
+    setWalkProgress(null);
+  }
+
+  function startWalk() {
+    if (!route || !route.polyline) return;
+    stopWalk();
+    walkStepsRef.current = buildSteps(route.polyline, selectedPin, stages, AMENITY_TYPES);
+    setWalkProgress(0);
+    const DURATION_MS = 15000;
+    const TICK_MS     = 50;
+    const INCREMENT   = TICK_MS / DURATION_MS;
+    walkIntervalRef.current = setInterval(() => {
+      setWalkProgress(prev => {
+        const next = (prev ?? 0) + INCREMENT;
+        if (next >= 1) {
+          clearInterval(walkIntervalRef.current);
+          walkIntervalRef.current = null;
+          return 1;
+        }
+        return next;
+      });
+    }, TICK_MS);
   }
 
   // ── Add to plan ──────────────────────────────────────────────────────────
@@ -316,6 +505,22 @@ export default function StageFinderScreen() {
   const selectedStage     = stages.find(s => s.id === selectedPin);
   const startLabel = startId === 'entrance' ? 'Entrance' : `Stage ${startId}`;
 
+  // Walk step and dot position (derived on each render, cheap)
+  const isWalking  = walkProgress !== null;
+  const arrived    = walkProgress === 1;
+  const dotPos     = (isWalking && route) ? interpolatePolyline(route.polyline, walkProgress) : null;
+
+  const currentStep = (() => {
+    if (!isWalking || walkStepsRef.current.length === 0) return null;
+    let best = walkStepsRef.current[0];
+    for (const s of walkStepsRef.current) {
+      if ((walkProgress ?? 0) >= s.threshold) best = s;
+    }
+    return best;
+  })();
+
+  const selectedStageName = selectedStage ? selectedStage.name : (selectedPin ? `Stage ${selectedPin}` : '');
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <ScrollView
@@ -327,6 +532,18 @@ export default function StageFinderScreen() {
         <Text style={styles.heading}>Stage finder</Text>
       </View>
       <Text style={styles.mapNote}>Illustrative map · Not to scale · Sample names</Text>
+
+      {/* Walk banner */}
+      {isWalking && (
+        <View style={styles.walkBanner}>
+          <Text style={styles.walkBannerText}>
+            {arrived
+              ? `You've arrived at ${selectedStageName}`
+              : (currentStep ? currentStep.text : `Walking to ${selectedStageName}…`)}
+          </Text>
+          <Text style={styles.walkSimLabel}>Simulated walk, not live GPS</Text>
+        </View>
+      )}
 
       {/* Pick-start hint */}
       {pickingStart && (
@@ -517,6 +734,35 @@ export default function StageFinderScreen() {
             />
           )}
         </Svg>
+
+        {/* ── Overlay SVG: "You" dot (separate so main map never re-renders during animation) */}
+        {dotPos && (
+          <Svg
+            viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+            width="100%"
+            style={{ aspectRatio: MAP_W / MAP_H, position: 'absolute', top: 0, left: 0 }}
+            pointerEvents="none"
+          >
+            <Circle
+              cx={dotPos.x}
+              cy={dotPos.y}
+              r={16}
+              fill={Colors.yellow}
+              stroke={Colors.ink}
+              strokeWidth={3}
+            />
+            <SvgText
+              x={dotPos.x}
+              y={dotPos.y + 6}
+              fontSize={11}
+              fontWeight="700"
+              textAnchor="middle"
+              fill={Colors.ink}
+            >
+              You
+            </SvgText>
+          </Svg>
+        )}
       </View>
 
       {/* ── Amenity legend chips ── */}
@@ -598,6 +844,18 @@ export default function StageFinderScreen() {
             </Text>
           )}
 
+          {/* Walk / Stop button */}
+          {route && (
+            <TouchableOpacity
+              style={[styles.walkBtn, isWalking && styles.walkBtnActive]}
+              onPress={isWalking ? stopWalk : startWalk}
+            >
+              <Text style={[styles.walkBtnText, isWalking && styles.walkBtnTextActive]}>
+                {isWalking ? 'Stop' : 'Walk'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity style={styles.addBtn} onPress={handleAddToPlan}>
             <Text style={styles.addBtnText}>Add to my plan</Text>
           </TouchableOpacity>
@@ -610,7 +868,10 @@ export default function StageFinderScreen() {
           act={openAct}
           savedActIds={savedActIds}
           onToggleSaved={handleToggleSaved}
-          onFindOnMap={() => setOpenAct(null)}
+          onFindOnMap={(act) => {
+            setOpenAct(null);
+            selectStage(act.stage_id);
+          }}
           onClose={() => setOpenAct(null)}
         />
       )}
@@ -826,5 +1087,44 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.display,
     fontSize: 17,
     color: Colors.white,
+  },
+
+  // ── Walk button ──
+  walkBtn: {
+    ...secondaryButtonStyle,
+    marginBottom: 10,
+  },
+  walkBtnActive: {
+    backgroundColor: Colors.savedPink,
+  },
+  walkBtnText: {
+    ...secondaryButtonTextStyle,
+  },
+  walkBtnTextActive: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: 15,
+    color: Colors.ink,
+  },
+
+  // ── Walk banner ──
+  walkBanner: {
+    backgroundColor: Colors.paleYellow,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 10,
+    gap: 2,
+  },
+  walkBannerText: {
+    fontFamily: Fonts.display,
+    fontSize: 15,
+    color: Colors.ink,
+  },
+  walkSimLabel: {
+    fontFamily: Fonts.detail,
+    fontSize: 13,
+    color: Colors.muted,
   },
 });

@@ -238,3 +238,23 @@ Removed `minWidth: 44`, added `alignSelf: 'center'` on the pill and `flexShrink:
    - **Add your own tip**: text + hashtags fields, saves to `tips` with `source_name = 'My tip'`, stays on device.
    - Removed `DemoLocationChip` (was left over from old screen).
 
+
+## 2026-11-22 — Walking dot on illustrated map
+
+**You asked:** Add a simulated "You" dot that walks the route on the Stage finder map, with a step banner, arrival state, and Find on map wiring.
+
+**What I did:**
+
+1. **`app/(tabs)/stage-finder.jsx`** — all changes in one file:
+   - Added `interpolatePolyline(polyline, t)` helper: walks polyline segments proportionally to a 0–1 progress value and returns `{x, y}`.
+   - Added `polylineSegFractions` and `buildSteps(polyline, destStageId, stages, amenityTypes)`: computes 2–4 named step strings from interior polyline waypoints, referencing nearby stages or amenities within 180 map units, with a final "Stage N is ahead" step.
+   - Added `walkProgress` state (null = off, 0–1 = running/arrived), `walkIntervalRef`, `walkStepsRef`.
+   - Added `startWalk()`: 15-second fixed-duration playback, `setInterval` at 50ms increments.
+   - Added `stopWalk()`: clears interval, resets progress to null.
+   - Extracted `selectStage(stageId)`: shared route-selection logic used by pin tap, `open_stage` handler, and `onFindOnMap`.
+   - `useFocusEffect` now reads `open_stage` from settings on every focus, calls `selectStage`, clears the flag.
+   - Added overlay SVG (`position: absolute`, same viewBox) containing only the "You" dot circle + label — main map SVG never re-renders during animation.
+   - Walk banner appears above the map while walking: shows current step text, "Simulated walk, not live GPS" label, and "You've arrived at Stage N" on arrival.
+   - Walk / Stop button added to stage card below the walk time line.
+   - `onFindOnMap` in ArtistCard (within stage finder) now calls `selectStage(act.stage_id)` instead of being a no-op.
+
