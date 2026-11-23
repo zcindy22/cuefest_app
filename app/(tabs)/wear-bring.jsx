@@ -70,6 +70,22 @@ function parseTipText(type, text) {
 
 // ── Main screen ──────────────────────────────────────────────────────────────
 
+// ── Festival hashtags (change FESTIVAL_TAG once to reuse for another festival) ──
+const FESTIVAL_TAG = 'IIIPoints';
+const CATEGORIES = [
+  { key: 'fits', label: `#${FESTIVAL_TAG}Fits` },
+  { key: 'bring', label: `#${FESTIVAL_TAG}WhatToBring` },
+  { key: 'tips', label: `#${FESTIVAL_TAG}Tips` },
+];
+const BRING_TAGS = ['#packlight', '#battery', '#water', '#hydration', '#earplugs', '#phone', '#signal', '#poncho', '#shoes', '#rain'];
+
+function categoryOf(t) {
+  if (t.type === 'fit') return 'fits';
+  if (t.type === 'review') return 'tips';
+  const tags = t.tags || '';
+  return BRING_TAGS.some(b => tags.includes(b)) ? 'bring' : 'tips';
+}
+
 export default function WearAndBringScreen() {
   const insets = useSafeAreaInsets();
   const db = getDb();
@@ -82,8 +98,7 @@ export default function WearAndBringScreen() {
 
   // UI state
   const [picksOpen, setPicksOpen] = useState(false);
-  const [filterType, setFilterType] = useState('All');
-  const [activeTag, setActiveTag] = useState(null);
+  const [activeCat, setActiveCat] = useState(null);
   const [showMoreTips, setShowMoreTips] = useState(false);
 
   // Add packing item
@@ -194,35 +209,8 @@ export default function WearAndBringScreen() {
   // Count for the picker accordion title
   const picksCount = tips.length;
 
-  // Filter tips for display
-  const filteredTips = tips.filter(t => {
-    // Exclude 'My tip' sourced items from the feed (they show nowhere but are stored)
-    if (filterType !== 'All' && t.type !== filterType.toLowerCase() && filterType !== 'Tips') {
-      if (filterType === 'Tips' && t.type !== 'tip') return false;
-      if (filterType === 'Fits' && t.type !== 'fit') return false;
-      if (filterType === 'Reviews' && t.type !== 'review') return false;
-      return false;
-    }
-    if (filterType === 'Tips' && t.type !== 'tip') return false;
-    if (filterType === 'Fits' && t.type !== 'fit') return false;
-    if (filterType === 'Reviews' && t.type !== 'review') return false;
-    if (activeTag && !(t.tags || '').includes(activeTag)) return false;
-    return true;
-  });
-
-  // Top hashtags across all tips
-  const tagCounts = {};
-  tips.forEach(t => {
-    (t.tags || '').split(' ').forEach(tag => {
-      if (tag.startsWith('#')) {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      }
-    });
-  });
-  const topTags = Object.entries(tagCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([tag]) => tag);
+  // Filter tips for display: one festival hashtag per category
+  const filteredTips = tips.filter(t => !activeCat || categoryOf(t) === activeCat);
 
   const visibleTips = showMoreTips ? filteredTips : filteredTips.slice(0, 4);
 
@@ -278,35 +266,14 @@ export default function WearAndBringScreen() {
       {/* ── Packing list ──────────────────────────────────────────────────── */}
       <View style={[styles.sectionHeader, { marginTop: 24 }]}>
         <Text style={styles.sectionTitle}>Packing list</Text>
-        <Pressable
-          style={styles.plusButton}
-          onPress={() => setAddingItem(v => !v)}
-          accessibilityLabel="Add item to packing list"
-          hitSlop={8}
-        >
-          <Ionicons name={addingItem ? 'close' : 'add'} size={20} color={Colors.ink} />
-        </Pressable>
       </View>
 
-      {addingItem ? (
-        <View style={styles.addItemRow}>
-          <TextInput
-            style={styles.addItemInput}
-            placeholder="New item…"
-            placeholderTextColor={Colors.muted}
-            value={newItemText}
-            onChangeText={setNewItemText}
-            onSubmitEditing={addPackingItem}
-            returnKeyType="done"
-            autoFocus
-          />
-          <Pressable style={styles.addItemBtn} onPress={addPackingItem}>
-            <Text style={styles.addItemBtnText}>Add</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
       <View style={styles.listCard}>
+        <ScrollView
+          style={styles.packScroll}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
+        >
         {packingItems.map((item, idx) => (
           <View
             key={item.id}
@@ -354,8 +321,36 @@ export default function WearAndBringScreen() {
           </View>
         ))}
         {packingItems.length === 0 && (
-          <Text style={styles.emptyText}>Tap + to add your first item.</Text>
+          <Text style={styles.emptyText}>Tap Add item to add your first item.</Text>
         )}
+        </ScrollView>
+
+        {addingItem ? (
+          <View style={styles.addItemInline}>
+            <TextInput
+              style={styles.addItemInput}
+              placeholder="New item…"
+              placeholderTextColor={Colors.muted}
+              value={newItemText}
+              onChangeText={setNewItemText}
+              onSubmitEditing={addPackingItem}
+              returnKeyType="done"
+              autoFocus
+            />
+            <Pressable style={styles.addItemBtn} onPress={addPackingItem}>
+              <Text style={styles.addItemBtnText}>Add</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <Pressable
+          style={styles.packFooter}
+          onPress={() => setAddingItem(v => !v)}
+          accessibilityLabel="Add item to packing list"
+        >
+          <Ionicons name={addingItem ? 'close' : 'add'} size={20} color={Colors.ink} />
+          <Text style={styles.packFooterText}>{addingItem ? 'Cancel' : 'Add item'}</Text>
+        </Pressable>
       </View>
 
       {/* ── Leave at home ─────────────────────────────────────────────────── */}
@@ -408,59 +403,31 @@ export default function WearAndBringScreen() {
             <Text style={styles.lastUpdated}>Last updated {lastUpdated}</Text>
           ) : null}
 
-          {/* Filter type chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            {['All', 'Tips', 'Fits', 'Reviews'].map(f => (
+          {/* Festival hashtag filters */}
+          <View style={styles.chipsRow}>
+            {CATEGORIES.map(c => (
               <Pressable
-                key={f}
+                key={c.key}
                 style={[
                   styles.filterChip,
-                  filterType === f && styles.filterChipActive,
+                  activeCat === c.key && styles.filterChipActive,
                 ]}
-                onPress={() => { setFilterType(f); setShowMoreTips(false); }}
+                onPress={() => {
+                  setActiveCat(activeCat === c.key ? null : c.key);
+                  setShowMoreTips(false);
+                }}
               >
                 <Text
                   style={[
                     styles.filterChipText,
-                    filterType === f && styles.filterChipTextActive,
+                    activeCat === c.key && styles.filterChipTextActive,
                   ]}
                 >
-                  {f}
+                  {c.label}
                 </Text>
               </Pressable>
             ))}
-          </ScrollView>
-
-          {/* Top hashtag chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            {topTags.map(tag => (
-              <Pressable
-                key={tag}
-                style={[
-                  styles.hashChip,
-                  activeTag === tag && styles.hashChipActive,
-                ]}
-                onPress={() => setActiveTag(activeTag === tag ? null : tag)}
-              >
-                <Text
-                  style={[
-                    styles.hashChipText,
-                    activeTag === tag && styles.hashChipTextActive,
-                  ]}
-                >
-                  {tag}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          </View>
 
           {/* Feed */}
           {visibleTips.map(tip => (
@@ -708,6 +675,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Packing list: short scrollable card with Add item at the bottom
+  packScroll: {
+    maxHeight: 230,
+  },
+  addItemInline: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.ink,
+  },
+  packFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.ink,
+  },
+  packFooterText: {
+    fontFamily: Fonts.display,
+    fontSize: 15,
+    color: Colors.ink,
+  },
+
   // Add item row
   addItemRow: {
     flexDirection: 'row',
@@ -871,6 +864,7 @@ const styles = StyleSheet.create({
   // Filter chips
   chipsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingBottom: 10,
   },

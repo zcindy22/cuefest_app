@@ -5,6 +5,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
+import graniteTips from '../assets/granite-tips.json';
 
 let db = null;
 // Holds the in-flight init promise so concurrent callers share one open.
@@ -331,11 +332,13 @@ async function _doInit(attempt = 1) {
     database.execSync("ALTER TABLE tips ADD COLUMN tags TEXT DEFAULT ''");
   }
 
-  // ── Seed tips (version-gated: tips_version = '1') ─────────────────────────
+  // ── Seed tips (version-gated: tips_version = '2') ─────────────────────────
   const tipsVersion = database.getFirstSync(
     "SELECT value FROM settings WHERE key = 'tips_version'"
   );
-  if (!tipsVersion || tipsVersion.value !== '1') {
+  // Changes whenever the Granite file is regenerated, so the tips reseed.
+  const TIPS_VERSION = '3-' + (graniteTips.generated_at || 'none');
+  if (!tipsVersion || tipsVersion.value !== TIPS_VERSION) {
     database.execSync('DELETE FROM tips');
     const today = new Date().toISOString().slice(0, 10);
     const TIPS_DATA = [
@@ -348,21 +351,26 @@ async function _doInit(attempt = 1) {
       { tip_text: 'Bring a portable charger.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#battery #packlight' },
       // ── Sample tips ──
       { tip_text: 'Comfy shoes win. You will walk way more than you think between stages.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#shoes #walking' },
-      { tip_text: 'Pick a meetup spot with your group before the biggest crowds build.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#meetup #crowds' },
-      { tip_text: 'A cheap clear poncho beats an umbrella in a packed crowd.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#rain #packlight' },
       { tip_text: 'Fill your bottle at the water stations instead of buying more.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#water #hydration' },
-      { tip_text: 'Screenshot your ticket and your plan in case the signal drops.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#phone #signal' },
-      { tip_text: 'Bring earplugs. Your ears will thank you near the front.', source_name: null, source_url: null, is_general: 1, type: 'tip', tags: '#earplugs #hearing' },
       // ── Sample fits (title|pieces encoded in tip_text) ──
       { tip_text: 'Breezy and light|linen shirt, cargo shorts, white sneakers', source_name: null, source_url: null, is_general: 1, type: 'fit', tags: '#sunny #cargo' },
-      { tip_text: 'Night owl layers|black tee, light jacket, cargo pants', source_name: null, source_url: null, is_general: 1, type: 'fit', tags: '#night #layers' },
       { tip_text: 'Rain ready|clear poncho, quick dry shorts, waterproof sandals', source_name: null, source_url: null, is_general: 1, type: 'fit', tags: '#rain #poncho' },
-      { tip_text: 'Dance floor comfort|tank top, bike shorts, broken in sneakers', source_name: null, source_url: null, is_general: 1, type: 'fit', tags: '#shoes #dancing' },
       // ── Sample reviews (text|verdict encoded in tip_text) ──
       { tip_text: 'Water refill stations were easy to find and the lines moved fast.|Worth it', source_name: null, source_url: null, is_general: 1, type: 'review', tags: '#water #lines' },
-      { tip_text: 'Food lines got long at peak hours. Eat before the headliners start.|Mixed', source_name: null, source_url: null, is_general: 1, type: 'review', tags: '#food #lines' },
       { tip_text: 'The shaded rest area near the back was a lifesaver in the afternoon.|Worth it', source_name: null, source_url: null, is_general: 1, type: 'review', tags: '#shade #rest' },
     ];
+    // ── Tips drafted by IBM Granite on watsonx.ai from public coverage ──
+    // Generated offline by scripts/granite_tips.mjs and saved in assets/granite-tips.json,
+    // so the app itself needs no API key. Empty until the script has been run.
+    if ((graniteTips.tips || []).length > 0) {
+      // Granite wrote tips from the same public coverage, so drop the hand written copies.
+      for (let i = TIPS_DATA.length - 1; i >= 0; i--) {
+        if (TIPS_DATA[i].source_name === 'BizBash' || TIPS_DATA[i].source_name === 'III Points FAQ') TIPS_DATA.splice(i, 1);
+      }
+    }
+    for (const g of (graniteTips.tips || [])) {
+      TIPS_DATA.push({ tip_text: g.tip, source_name: 'IBM Granite on watsonx.ai, from public coverage', source_url: 'https://www.ibm.com/granite', is_general: 0, type: 'tip', tags: g.tags });
+    }
     const tipStmt = database.prepareSync(
       'INSERT INTO tips (tip_text, source_name, source_url, is_general, type, tags, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
@@ -370,9 +378,10 @@ async function _doInit(attempt = 1) {
       tipStmt.executeSync([t.tip_text, t.source_name, t.source_url, t.is_general, t.type, t.tags, today]);
     }
     tipStmt.finalizeSync();
-    database.runSync(
-      `INSERT INTO settings (key, value) VALUES ('tips_version', '1')
-       ON CONFLICT(key) DO UPDATE SET value = '1'`
+        database.runSync(
+      `INSERT INTO settings (key, value) VALUES ('tips_version', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [TIPS_VERSION]
     );
   }
 
