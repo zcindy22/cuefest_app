@@ -298,6 +298,9 @@ export default function StageFinderScreen() {
   // Artist card
   const [openAct, setOpenAct] = useState(null);
 
+  // Map rendered width — used to scale touch coords to SVG viewBox coords
+  const mapWidthRef = useRef(null);
+
   // Walking dot
   const [walkProgress, setWalkProgress] = useState(null); // null = not walking, 0–1 = walking/arrived
   const walkIntervalRef = useRef(null);
@@ -329,10 +332,12 @@ export default function StageFinderScreen() {
           const curStartId = startId; // captured from closure
           const startPos = curStartId === 'entrance'
             ? { x: ENTRANCE.x, y: ENTRANCE.y }
-            : getPosition(curStartId);
+            : typeof curStartId === 'object'
+              ? curStartId
+              : getPosition(curStartId) ?? { x: ENTRANCE.x, y: ENTRANCE.y };
           const destPos = getPosition(stageId);
           if (startPos && destPos) {
-            const sLabel = curStartId === 'entrance' ? 'entrance' : `stage_${curStartId}`;
+            const sLabel = curStartId === 'entrance' ? 'entrance' : typeof curStartId === 'object' ? 'custom' : `stage_${curStartId}`;
             const dLabel = `stage_${stageId}`;
             const newRoute = sLabel !== dLabel
               ? calcRoute(startPos, destPos, sLabel, dLabel)
@@ -350,6 +355,19 @@ export default function StageFinderScreen() {
     }, [])
   );
 
+  // ── Start position helpers ────────────────────────────────────────────────
+  // startId is 'entrance' | stage number | { x, y } for a free-form map tap
+  function getStartPos(id) {
+    if (!id || id === 'entrance') return { x: ENTRANCE.x, y: ENTRANCE.y };
+    if (typeof id === 'object') return id; // free-form {x, y}
+    return getPosition(id) ?? { x: ENTRANCE.x, y: ENTRANCE.y };
+  }
+  function getStartNodeLabel(id) {
+    if (!id || id === 'entrance') return 'entrance';
+    if (typeof id === 'object') return 'custom';
+    return `stage_${id}`;
+  }
+
   // ── selectStage: shared logic for pin tap and open_stage ─────────────────
   function selectStage(stageId) {
     setNearestResult(null);
@@ -358,16 +376,14 @@ export default function StageFinderScreen() {
     setSelectedSetIdx(0);
     stopWalk();
 
-    const startPos = startId === 'entrance'
-      ? { x: ENTRANCE.x, y: ENTRANCE.y }
-      : getPosition(startId);
+    const startPos = getStartPos(startId);
     const destPos = getPosition(stageId);
 
     if (startPos && destPos) {
-      const startLabel = startId === 'entrance' ? 'entrance' : `stage_${startId}`;
+      const sLabel = getStartNodeLabel(startId);
       const destLabel  = `stage_${stageId}`;
-      if (startLabel !== destLabel) {
-        setRoute(calcRoute(startPos, destPos, startLabel, destLabel));
+      if (sLabel !== destLabel) {
+        setRoute(calcRoute(startPos, destPos, sLabel, destLabel));
       } else {
         setRoute({ polyline: [[destPos.x, destPos.y]], minutes: 0 });
       }
@@ -390,6 +406,26 @@ export default function StageFinderScreen() {
       return;
     }
     selectStage(stageId);
+  }
+
+  // ── Map tap: set free-form start when picking ─────────────────────────────
+  function handleMapTap(evt) {
+    if (!pickingStart) return;
+    const rendered = mapWidthRef.current;
+    if (!rendered) return;
+    const { locationX, locationY } = evt.nativeEvent;
+    const svgX = Math.round((locationX / rendered) * MAP_W);
+    const svgY = Math.round((locationY / (rendered * (MAP_H / MAP_W))) * MAP_H);
+    const freeStart = { x: svgX, y: svgY };
+    setStartId(freeStart);
+    setPickingStart(false);
+    stopWalk();
+    if (selectedPin) {
+      const dest = getPosition(selectedPin);
+      if (dest) {
+        setRoute(calcRoute(freeStart, dest, 'custom', `stage_${selectedPin}`));
+      }
+    }
   }
 
   // ── Walk / Stop ───────────────────────────────────────────────────────────
@@ -467,14 +503,10 @@ export default function StageFinderScreen() {
     setSelectedPin(null);
     setRoute(null);
 
-    const startPos = startId === 'entrance'
-      ? { x: ENTRANCE.x, y: ENTRANCE.y }
-      : getPosition(startId);
-
+    const startPos = getStartPos(startId);
     if (!startPos) return;
 
-    const startLabel = startId === 'entrance' ? 'entrance' : `stage_${startId}`;
-    const result = findNearestAmenity(startPos, amenityType, startLabel);
+    const result = findNearestAmenity(startPos, amenityType, getStartNodeLabel(startId));
     if (!result) return;
 
     setHighlightedAmenity(result.amenity.idx);
@@ -503,7 +535,11 @@ export default function StageFinderScreen() {
   // ── Derived ──────────────────────────────────────────────────────────────
   const selectedStageSets = selectedPin ? sets.filter(s => s.stage_id === selectedPin) : [];
   const selectedStage     = stages.find(s => s.id === selectedPin);
-  const startLabel = startId === 'entrance' ? 'Entrance' : `Stage ${startId}`;
+  const startLabel = startId === 'entrance'
+    ? 'Entrance'
+    : typeof startId === 'object'
+      ? 'Custom spot'
+      : `Stage ${startId}`;
 
   // Walk step and dot position (derived on each render, cheap)
   const isWalking  = walkProgress !== null;
@@ -548,16 +584,20 @@ export default function StageFinderScreen() {
       {/* Pick-start hint */}
       {pickingStart && (
         <View style={styles.pickHint}>
-          <Text style={styles.pickHintText}>Tap any stage pin to set it as your start</Text>
+          <Text style={styles.pickHintText}>Tap anywhere on the map to set your start</Text>
         </View>
       )}
 
       {/* ── SVG Map ── */}
-      <View style={styles.mapContainer}>
+      <View
+        style={styles.mapContainer}
+        onLayout={e => { mapWidthRef.current = e.nativeEvent.layout.width; }}
+      >
         <Svg
           viewBox={`0 0 ${MAP_W} ${MAP_H}`}
           width="100%"
           style={{ aspectRatio: MAP_W / MAP_H }}
+          onPress={handleMapTap}
         >
           {/* Background */}
           <Rect width={MAP_W} height={MAP_H} fill="#FFFAF2" />
@@ -726,13 +766,25 @@ export default function StageFinderScreen() {
             );
           })}
 
-          {/* Start ring if entrance is start */}
-          {startId === 'entrance' && (
-            <Circle
-              cx={ENTRANCE.x} cy={ENTRANCE.y - 24} r={10}
-              fill={Colors.pink} stroke="#1B1B22" strokeWidth={2}
-            />
-          )}
+          {/* Start marker — location pin shape */}
+          {(startId === 'entrance' || typeof startId === 'object') && (() => {
+            const px = startId === 'entrance' ? ENTRANCE.x : startId.x;
+            const py = startId === 'entrance' ? ENTRANCE.y : startId.y;
+            return (
+              <G transform={`translate(${px},${py})`}>
+                {/* Pin body: tip at (0,0), head center at (0,-30) r=20 */}
+                <Path
+                  d="M0,0 C-13,-14 -22,-24 -22,-34 A22,22 0 1,1 22,-34 C22,-24 13,-14 0,0 Z"
+                  fill={Colors.deepPink}
+                  stroke="#1B1B22"
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                />
+                {/* White hole */}
+                <Circle cx={0} cy={-34} r={9} fill="#FFFFFF" />
+              </G>
+            );
+          })()}
         </Svg>
 
         {/* ── Overlay SVG: "You" dot (separate so main map never re-renders during animation) */}

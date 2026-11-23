@@ -1,16 +1,36 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { Colors, Fonts } from '../../theme/theme';
 
 // Active tab: yellow outlined pill with icon + label in Display 14
-function ActiveTabIcon({ iconName, label }) {
+function ActiveTabButton({ iconName, label, onPress, onLongPress, children, style }) {
   return (
-    <View style={tabStyles.activePill}>
-      <Ionicons name={iconName} size={20} color={Colors.ink} />
-      <Text style={tabStyles.activeLabel} numberOfLines={1}>{label}</Text>
-    </View>
+    <TouchableOpacity
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[tabStyles.tabCell, style]}
+      activeOpacity={0.8}
+    >
+      <View style={tabStyles.activePill}>
+        <Ionicons name={iconName} size={20} color={Colors.ink} />
+        <Text style={tabStyles.activeLabel} numberOfLines={1}>{label}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function InactiveTabButton({ iconName, onPress, onLongPress, style }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[tabStyles.tabCell, style]}
+      activeOpacity={0.7}
+    >
+      <Ionicons name={iconName} size={24} color={Colors.muted} />
+    </TouchableOpacity>
   );
 }
 
@@ -36,12 +56,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Lineup',
-          tabBarIcon: ({ focused }) =>
-            focused ? (
-              <ActiveTabIcon iconName="calendar" label="Lineup" />
+          title: 'Plan',
+          tabBarButton: (props) =>
+            props.accessibilityState?.selected ? (
+              <ActiveTabButton {...props} iconName="calendar" label="Plan" />
             ) : (
-              <Ionicons name="calendar-outline" size={24} color={Colors.muted} />
+              <InactiveTabButton {...props} iconName="calendar-outline" />
             ),
         }}
       />
@@ -49,35 +69,35 @@ export default function TabLayout() {
         name="my-lineup"
         options={{
           title: 'Discover',
-          tabBarIcon: ({ focused }) =>
-            focused ? (
-              <ActiveTabIcon iconName="sparkles" label="Discover" />
+          tabBarButton: (props) =>
+            props.accessibilityState?.selected ? (
+              <ActiveTabButton {...props} iconName="sparkles" label="Discover" />
             ) : (
-              <Ionicons name="sparkles-outline" size={24} color={Colors.muted} />
+              <InactiveTabButton {...props} iconName="sparkles-outline" />
             ),
         }}
       />
       <Tabs.Screen
         name="stage-finder"
         options={{
-          title: 'Map',
-          tabBarIcon: ({ focused }) =>
-            focused ? (
-              <ActiveTabIcon iconName="map" label="Map" />
+          title: 'Nav',
+          tabBarButton: (props) =>
+            props.accessibilityState?.selected ? (
+              <ActiveTabButton {...props} iconName="map" label="Nav" />
             ) : (
-              <Ionicons name="map-outline" size={24} color={Colors.muted} />
+              <InactiveTabButton {...props} iconName="map-outline" />
             ),
         }}
       />
       <Tabs.Screen
         name="wear-bring"
         options={{
-          title: 'Wear',
-          tabBarIcon: ({ focused }) =>
-            focused ? (
-              <ActiveTabIcon iconName="shirt" label="Wear" />
+          title: 'Wear & Tips',
+          tabBarButton: (props) =>
+            props.accessibilityState?.selected ? (
+              <ActiveTabButton {...props} iconName="shirt" label="Wear & Tips" />
             ) : (
-              <Ionicons name="shirt-outline" size={24} color={Colors.muted} />
+              <InactiveTabButton {...props} iconName="shirt-outline" />
             ),
         }}
       />
@@ -86,6 +106,11 @@ export default function TabLayout() {
 }
 
 const tabStyles = StyleSheet.create({
+  tabCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -97,12 +122,10 @@ const tabStyles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     minHeight: 36,
-    alignSelf: 'center',
   },
   activeLabel: {
     fontFamily: Fonts.display,
     fontSize: 14,
     color: Colors.ink,
-    flexShrink: 0,
   },
 });
