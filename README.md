@@ -45,3 +45,5 @@ All data is simulated and clearly labeled. No real reviews, no personal data, no
 - Map drawing and sample acts: Cue's own (illustrative only, not an official map).
 - Attendee tips: drawn from public news coverage (BizBash) and the festival FAQ. No personal data, no social media data.
 - Statistics used: https://www.nielsen.com/insights/2015/for-music-fans-the-summer-is-all-a-stage/
+- The Festiverse App Store page: apps.apple.com/us/app/festiverse/id6744997695
+- The Festiverse review summary on justuseapp.com: justuseapp.com/en/app/6744997695/festiverse/reviews
